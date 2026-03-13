@@ -7,8 +7,8 @@
 
 <link rel="stylesheet" href="css/style.css">
 
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
+<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 </head>
 
@@ -20,52 +20,120 @@
 </header>
 
 
-<div class="container">
+<div class="main-tabs">
 
-<div class="sidebar">
-
-<h3>Spatial Viewer</h3>
-
-<button onclick="showPanel('spatialSingle')">
-Single Gene Plot
+<button class="tab-button active" onclick="openMainTab('spatial')">
+Spatial Viewer
 </button>
 
-<button onclick="showPanel('spatialHeatmap')">
-Multi-Gene Heatmap
-</button>
-
-
-<h3>Spatiotemporal Viewer</h3>
-
-<button onclick="showPanel('temporalSingle')">
-Single Gene Plot
-</button>
-
-<button onclick="showPanel('temporalHeatmap')">
-Multi-Gene Heatmap
+<button class="tab-button" onclick="openMainTab('temporal')">
+Spatiotemporal Viewer
 </button>
 
 </div>
 
 
-<div class="content">
+<!-- SPATIAL TAB -->
 
-<div id="spatialSingle" class="panel">
+<div id="spatial" class="main-tab-content active">
 
-<h2>Spatial Expression</h2>
+<div class="sub-tabs">
 
-<input id="geneInput" placeholder="Enter gene (e.g. tbx6)">
+<button class="subtab-button active" onclick="openSubTab('spatialSingle')">
+Single Gene
+</button>
 
-<button onclick="runSpatial()">Plot</button>
+<button class="subtab-button" onclick="openSubTab('spatialHeatmap')">
+Heatmap
+</button>
+
+</div>
+
+
+<div id="spatialSingle" class="subtab-content active">
+
+<h3>Single Gene Spatial Expression</h3>
+
+<input id="spatialGene" placeholder="Enter gene (e.g. tbx6)">
+
+<button onclick="plotSpatial()">Plot</button>
+
+</div>
+
+
+<div id="spatialHeatmap" class="subtab-content">
+
+<h3>Spatial Heatmap</h3>
+
+<textarea id="spatialGenes"
+placeholder="Enter genes separated by commas"></textarea>
+
+<button onclick="plotSpatialHeatmap()">Generate Heatmap</button>
+
+</div>
+
+</div>
+
+
+
+<!-- TEMPORAL TAB -->
+
+<div id="temporal" class="main-tab-content">
+
+<div class="sub-tabs">
+
+<button class="subtab-button active" onclick="openSubTab('temporalSingle')">
+Single Gene
+</button>
+
+<button class="subtab-button" onclick="openSubTab('temporalHeatmap')">
+Heatmap
+</button>
+
+</div>
+
+
+<div id="temporalSingle" class="subtab-content active">
+
+<h3>Spatiotemporal Single Gene</h3>
+
+<input id="temporalGene">
+
+<select id="region">
+
+<option>Posterior</option>
+<option>Anterior</option>
+<option>Somite</option>
+
+</select>
+
+<button onclick="plotTemporal()">Plot</button>
+
+</div>
+
+
+<div id="temporalHeatmap" class="subtab-content">
+
+<h3>Spatiotemporal Heatmap</h3>
+
+<textarea id="temporalGenes"></textarea>
+
+<select id="heatmapRegion">
+
+<option>Posterior</option>
+<option>Anterior</option>
+<option>Somite</option>
+
+</select>
+
+<button onclick="plotTemporalHeatmap()">Generate Heatmap</button>
+
+</div>
 
 </div>
 
 
 <div id="plot"></div>
-
-</div>
-
-</div>
 
 
 <script src="js/data.js"></script>

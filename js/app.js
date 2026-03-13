@@ -1,70 +1,23 @@
-function runViewer(){
-
-let gene =
-document
-.getElementById("geneInput")
-.value
-.toLowerCase()
-
-let viewer =
-document
-.getElementById("viewer")
-.value
-
-if(viewer==="spatial")
-spatialPlot(gene)
-
-if(viewer==="temporal")
-temporalPlot(gene)
-
-}
-
-function showMainTab(id){
+function openMainTab(id){
 
 document
-.querySelectorAll(".mainTab")
-.forEach(t=>t.style.display="none")
+.querySelectorAll(".main-tab-content")
+.forEach(t=>t.classList.remove("active"))
 
 document
 .getElementById(id)
-.style.display="block"
+.classList.add("active")
 
 }
 
-function showSubTab(id){
+function openSubTab(id){
 
 document
-.querySelectorAll(".subTab")
-.forEach(t=>t.style.display="none")
+.querySelectorAll(".subtab-content")
+.forEach(t=>t.classList.remove("active"))
 
 document
 .getElementById(id)
-.style.display="block"
-
-}
-
-
-function showPanel(id){
-
-document
-.querySelectorAll(".panel")
-.forEach(p=>p.style.display="none")
-
-document
-.getElementById(id)
-.style.display="block"
-
-}
-
-function runSpatial(){
-
-const gene =
-document
-.getElementById("geneInput")
-.value
-.trim()
-.toLowerCase()
-
-spatialPlot(gene)
+.classList.add("active")
 
 }

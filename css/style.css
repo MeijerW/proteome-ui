@@ -1,62 +1,71 @@
 body{
 font-family:system-ui;
 margin:0;
-background:#f3f5f7;
+background:#f6f8fa;
 }
 
 .header{
-background:#243447;
+background:#1f2d3d;
 color:white;
-padding:30px;
+padding:25px;
 text-align:center;
 }
 
-.container{
+.main-tabs{
 display:flex;
-height:100vh;
-}
-
-.sidebar{
-width:260px;
 background:white;
-padding:20px;
-border-right:1px solid #ddd;
+border-bottom:1px solid #ddd;
 }
 
-.sidebar h3{
-margin-top:30px;
-}
-
-.sidebar button{
-width:100%;
-margin-top:10px;
-padding:10px;
+.tab-button{
+padding:14px 20px;
 border:none;
+background:white;
+cursor:pointer;
+font-size:16px;
+}
+
+.tab-button.active{
+border-bottom:3px solid #2c7be5;
+font-weight:bold;
+}
+
+.sub-tabs{
+margin-top:20px;
+}
+
+.subtab-button{
+padding:10px 16px;
+border:1px solid #ddd;
+background:white;
+cursor:pointer;
+margin-right:10px;
+border-radius:4px;
+}
+
+.subtab-button.active{
 background:#2c7be5;
 color:white;
-border-radius:4px;
-cursor:pointer;
 }
 
-.sidebar button:hover{
-background:#1a5fb4;
+.main-tab-content{
+display:none;
+padding:30px;
 }
 
-.content{
-flex:1;
-padding:40px;
+.main-tab-content.active{
+display:block;
 }
 
-.panel{
-margin-bottom:20px;
+.subtab-content{
+display:none;
+margin-top:20px;
 }
 
-input{
-padding:10px;
-font-size:16px;
-width:300px;
+.subtab-content.active{
+display:block;
 }
 
 #plot{
-margin-top:40px;
+padding:40px;
 }
