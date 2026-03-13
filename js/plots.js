@@ -39,6 +39,8 @@ width: 800
 }
 
 if(rnaGene.length > 0){
+    const order = ['Posterior', 'Anterior', 'Somite']
+    rnaGene.sort((a,b) => order.indexOf(a.group) - order.indexOf(b.group))
     traces.push({
         x:rnaGene.map(d=>d.group),
         y:rnaGene.map(d=>d["Z-score"]),
@@ -53,6 +55,8 @@ if(rnaGene.length > 0){
 }
 
 if(protGene.length > 0){
+    const order = ['Posterior', 'Anterior', 'Somite']
+    protGene.sort((a,b) => order.indexOf(a.group) - order.indexOf(b.group))
     traces.push({
         x:protGene.map(d=>d.group),
         y:protGene.map(d=>d["Z-score"]),
@@ -135,13 +139,28 @@ width: 800
 }
 
 if(rnaGene.length > 0){
+    // Group by time
+    const times = [...new Set(rnaGene.map(d=>d.time))].sort()
+    times.forEach(time => {
+        const yVals = rnaGene.filter(d=>d.time === time).map(d=>d["Z-score"])
+        traces.push({
+            x: [time],
+            y: yVals,
+            type: "box",
+            name: `RNA ${time}min`,
+            marker: {color: "#d5af34"},
+            xaxis: traces.length === 0 ? 'x' : 'x2',
+            yaxis: traces.length === 0 ? 'y' : 'y2'
+        })
+    })
+    // Stripplot
     traces.push({
-        x:rnaGene.map(d=> d.time ),
-        y:rnaGene.map(d=>d["Z-score"]),
-        type:"scatter",
-        mode:"lines+markers",
-        name:"RNA",
-        marker:{color:"#d5af34"},
+        x: rnaGene.map(d=>d.time),
+        y: rnaGene.map(d=>d["Z-score"]),
+        mode: "markers",
+        type: "scatter",
+        name: "RNA points",
+        marker: {color: "#d5af34", size: 6},
         xaxis: traces.length === 0 ? 'x' : 'x2',
         yaxis: traces.length === 0 ? 'y' : 'y2'
     })
@@ -150,13 +169,26 @@ if(rnaGene.length > 0){
 }
 
 if(protGene.length > 0){
+    const times = [...new Set(protGene.map(d=>d.time))].sort()
+    times.forEach(time => {
+        const yVals = protGene.filter(d=>d.time === time).map(d=>d["Z-score"])
+        traces.push({
+            x: [time],
+            y: yVals,
+            type: "box",
+            name: `Protein ${time}min`,
+            marker: {color: "#8281be"},
+            xaxis: traces.length === 0 ? 'x' : 'x2',
+            yaxis: traces.length === 0 ? 'y' : 'y2'
+        })
+    })
     traces.push({
-        x:protGene.map(d=> d.time ),
-        y:protGene.map(d=>d["Z-score"]),
-        type:"scatter",
-        mode:"lines+markers",
-        name:"Protein",
-        marker:{color:"#8281be"},
+        x: protGene.map(d=>d.time),
+        y: protGene.map(d=>d["Z-score"]),
+        mode: "markers",
+        type: "scatter",
+        name: "Protein points",
+        marker: {color: "#8281be", size: 6},
         xaxis: traces.length === 0 ? 'x' : 'x2',
         yaxis: traces.length === 0 ? 'y' : 'y2'
     })
@@ -164,18 +196,13 @@ if(protGene.length > 0){
     alert("Gene not found in Protein dataset")
 }
 
-if(traces.length === 2){
-    layout.grid = {rows: 2, columns: 1, pattern: 'independent'}
-    layout.xaxis = {title: 'Time (minutes)'}
+if(traces.length > 0){
+    layout.xaxis = {title: 'Time (minutes)', type: 'category'}
     layout.yaxis = {title: 'Z-score RNA'}
-    layout.xaxis2 = {title: 'Time (minutes)'}
-    layout.yaxis2 = {title: 'Z-score Protein'}
-} else if(traces.length === 1){
-    // Single plot
-    traces[0].xaxis = 'x'
-    traces[0].yaxis = 'y'
-    layout.xaxis = {title: 'Time (minutes)'}
-    layout.yaxis = {title: 'Z-score ' + traces[0].name}
+    if(traces.some(t=>t.xaxis === 'x2')){
+        layout.xaxis2 = {title: 'Time (minutes)', type: 'category'}
+        layout.yaxis2 = {title: 'Z-score Protein'}
+    }
 }
 
 Plotly.newPlot("plot", traces, layout)
@@ -260,9 +287,9 @@ const data = [
 const layout = {
     title: "Spatial Expression Heatmap",
     grid: {rows: 1, columns: 2, pattern: 'independent'},
-    xaxis: {title: 'Group'},
+    xaxis: {title: 'Group', type: 'category'},
     yaxis: {title: 'Genes'},
-    xaxis2: {title: 'Group'},
+    xaxis2: {title: 'Group', type: 'category'},
     yaxis2: {title: 'Genes'},
     height: 600,
     width: 1000

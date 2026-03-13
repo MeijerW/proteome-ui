@@ -14,7 +14,11 @@ header:true,
 dynamicTyping:true,
 skipEmptyLines:true
 }).data
-RNA_DATA = rnaCsvData
+RNA_DATA = rnaCsvData.map(row => ({
+    ID: row.Gene,
+    group: row.group,
+    "Z-score": row["Z-score"]
+}))
 
 const protCsv = await fetch(BASE+"Protein_preprocessed.csv")
 const protCsvText = await protCsv.text()
@@ -23,7 +27,11 @@ header:true,
 dynamicTyping:true,
 skipEmptyLines:true
 }).data
-PROT_DATA = protCsvData
+PROT_DATA = protCsvData.map(row => ({
+    ID: row.Gene,
+    group: row.group,
+    "Z-score": row["Z-score"]
+}))
 
 // Load spatiotemporal data from TSV and add
 const rnaFiles = [
