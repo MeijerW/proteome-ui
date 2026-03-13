@@ -143,6 +143,7 @@ button:hover {
 
 .launch-btn:hover {
     background: #005a5a;
+    color: #ffffff;
     transform: translateY(-2px);
 }
 
