@@ -6,7 +6,7 @@ async function loadGenes(){
     while(RNA_DATA.length === 0){
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-    geneList = [...new Set(RNA_DATA.map(d => d.Gene).filter(g => g))].sort();
+    geneList = [...new Set(RNA_DATA.map(d => d.ID).filter(g => g))].sort();
     populateDatalist('genes', geneList);
     updateTemporalGenes();
 }
@@ -25,7 +25,7 @@ function populateDatalist(id, list){
 
 function updateTemporalGenes(){
     const region = document.getElementById('region').value || document.getElementById('heatmapRegion').value;
-    geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.Gene).filter(g => g))].sort();
+    geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.ID).filter(g => g))].sort();
     populateDatalist('genes-temporal', geneListTemporal);
 }
 

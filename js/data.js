@@ -22,9 +22,22 @@ for (const file of rnaFiles) {
         skipEmptyLines: true,
         delimiter: '\t'
     }).data
-    // Add region to each row
-    data.forEach(row => row.region = file.region)
-    RNA_DATA = RNA_DATA.concat(data)
+    // Pivot to long format
+    const times = [30, 60, 90, 120]
+    data.forEach(row => {
+        times.forEach(time => {
+            const zscore = row[`TP_${time}_REP_1`]
+            if (zscore !== undefined && zscore !== null) {
+                RNA_DATA.push({
+                    ID: row.ID,
+                    region: file.region,
+                    group: file.region,
+                    time: time,
+                    "Z-score": zscore
+                })
+            }
+        })
+    })
 }
 
 // Protein files
@@ -43,15 +56,23 @@ for (const file of protFiles) {
         skipEmptyLines: true,
         delimiter: '\t'
     }).data
-    // Add region to each row
-    data.forEach(row => row.region = file.region)
-    PROT_DATA = PROT_DATA.concat(data)
+    // Pivot to long format
+    const times = [30, 60, 90, 120]
+    data.forEach(row => {
+        times.forEach(time => {
+            const zscore = row[`TP_${time}_REP_1`]
+            if (zscore !== undefined && zscore !== null) {
+                PROT_DATA.push({
+                    ID: row.ID,
+                    region: file.region,
+                    group: file.region,
+                    time: time,
+                    "Z-score": zscore
+                })
+            }
+        })
+    })
 }
-
-console.log('RNA_DATA loaded:', RNA_DATA.length, 'samples')
-console.log('PROT_DATA loaded:', PROT_DATA.length, 'samples')
-console.log('RNA sample:', RNA_DATA[0])
-console.log('PROT sample:', PROT_DATA[0])
 
 }
 

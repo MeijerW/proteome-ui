@@ -14,14 +14,14 @@ document
 
 const rnaGene =
 RNA_DATA.filter(
-d=>d.Gene &&
-d.Gene.toLowerCase()===gene
+d=>d.ID &&
+d.ID.toLowerCase()===gene
 )
 
 const protGene =
 PROT_DATA.filter(
-d=>d.Gene &&
-d.Gene.toLowerCase()===gene
+d=>d.ID &&
+d.ID.toLowerCase()===gene
 )
 
 if(rnaGene.length===0 && protGene.length===0){
@@ -105,8 +105,8 @@ document
 
 const rnaGene =
 RNA_DATA.filter(
-d=>d.Gene &&
-d.Gene.toLowerCase()===gene &&
+d=>d.ID &&
+d.ID.toLowerCase()===gene &&
 d.region &&
 d.region.toLowerCase() === region.toLowerCase() &&
 d.time >= 0
@@ -136,7 +136,7 @@ width: 800
 
 if(rnaGene.length > 0){
     traces.push({
-        x:rnaGene.map(d=> (d.time + 1) * 30 ),
+        x:rnaGene.map(d=> d.time ),
         y:rnaGene.map(d=>d["Z-score"]),
         type:"scatter",
         mode:"lines+markers",
@@ -151,7 +151,7 @@ if(rnaGene.length > 0){
 
 if(protGene.length > 0){
     traces.push({
-        x:protGene.map(d=> (d.time + 1) * 30 ),
+        x:protGene.map(d=> d.time ),
         y:protGene.map(d=>d["Z-score"]),
         type:"scatter",
         mode:"lines+markers",
@@ -211,14 +211,14 @@ const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene)
+    const rnaGene = RNA_DATA.filter(d=>d.ID && d.ID.toLowerCase()===gene)
     if(rnaGene.length > 0){
         const row = groups.map(group => {
             const entry = rnaGene.find(d=>d.group === group)
             return entry ? entry["Z-score"] : 0
         })
         matrix.push(row)
-        geneLabels.push(rnaGene[0].Gene)
+        geneLabels.push(rnaGene[0].ID)
     }
 })
 
@@ -254,22 +254,17 @@ document
 .getElementById("heatmapRegion")
 .value
 
-console.log('Region:', region)
-console.log('RNA_DATA sample:', RNA_DATA.slice(0,3))
-
 const genes = genesText.split(',').map(g=>g.trim().toLowerCase()).filter(g=>g)
-
-console.log('Input genes:', genes)
 
 const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
     const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
-    console.log(`Gene ${gene}: ${rnaGene.length} entries`, rnaGene.slice(0,2))
+
     if(rnaGene.length > 0){
         const times = [...new Set(rnaGene.map(d=>d.time))].sort()
-        const timeLabels = times.map(t => (t + 1) * 30)
+        const timeLabels = times.map(t => t)
         const row = times.map(time => {
             const entry = rnaGene.find(d=>d.time === time)
             return entry ? entry["Z-score"] : 0
@@ -279,17 +274,13 @@ genes.forEach(gene => {
     }
 })
 
-console.log('Matrix length:', matrix.length)
-
 if(matrix.length === 0){
 alert("No valid genes found in selected region")
 return
 }
 
 const times = [...new Set(RNA_DATA.filter(d=>d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d=>d.time))].sort()
-const timeLabels = times.map(t => (t + 1) * 30)
-
-console.log('Times:', times, 'TimeLabels:', timeLabels)
+const timeLabels = times.map(t => t)
 
 heatmap(matrix, geneLabels, timeLabels)
 
