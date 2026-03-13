@@ -42,3 +42,29 @@ document
 .style.display="block"
 
 }
+
+
+function showPanel(id){
+
+document
+.querySelectorAll(".panel")
+.forEach(p=>p.style.display="none")
+
+document
+.getElementById(id)
+.style.display="block"
+
+}
+
+function runSpatial(){
+
+const gene =
+document
+.getElementById("geneInput")
+.value
+.trim()
+.toLowerCase()
+
+spatialPlot(gene)
+
+}

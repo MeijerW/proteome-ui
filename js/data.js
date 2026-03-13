@@ -3,12 +3,14 @@ const BASE =
 
 async function loadCSV(file){
 
-const response = await fetch(BASE + file)
-const text = await response.text()
+    const response = await fetch(BASE + file)
+    const text = await response.text()
 
-return Papa.parse(text,{
-header:true,
-dynamicTyping:true
-}).data
+    const parsed = Papa.parse(text,{
+        header:true,
+        dynamicTyping:true,
+        skipEmptyLines:true
+    })
 
+    return parsed.data.filter(r => r.Gene)
 }
