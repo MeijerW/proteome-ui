@@ -1,355 +1,410 @@
 function plotSpatial(){
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        return;
+    }
 
-if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
-    alert("Data is still loading. Please wait a moment and try again.");
-    return;
-}
+    const gene = document.getElementById("spatialGene").value.trim().toLowerCase();
 
-const gene =
-document
-.getElementById("spatialGene")
-.value
-.trim()
-.toLowerCase()
+    const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
+    const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
 
-const rnaGene =
-RNA_DATA.filter(
-d=>d.ID &&
-String(d.ID).toLowerCase()===gene
-)
+    if(rnaGene.length === 0 && protGene.length === 0){
+        alert("Gene not found");
+        return;
+    }
 
-const protGene =
-PROT_DATA.filter(
-d=>d.ID &&
-String(d.ID).toLowerCase()===gene
-)
+    const traces = [];
+    const layout = {
+        title: "Spatial Expression",
+        template: "simple_white",
+        height: 600,
+        width: 800
+    };
 
-if(rnaGene.length===0 && protGene.length===0){
-alert("Gene not found")
-return
-}
+    const order = ['Posterior', 'Anterior', 'Somite'];
 
-let traces = []
-let layout = {
-title:"Spatial Expression",
-template:"simple_white",
-boxmode:"group",
-height: 800,
-width: 800
-}
+    if(rnaGene.length > 0){
+        rnaGene.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+        traces.push({
+            x: rnaGene.map(d => d.group),
+            y: rnaGene.map(d => d["Z-score"]),
+            type: "box",
+            name: "RNA",
+            marker: {color: "#d5af34"}
+        });
+    }
 
-if(rnaGene.length > 0){
-    const order = ['Posterior', 'Anterior', 'Somite']
-    rnaGene.sort((a,b) => order.indexOf(a.group) - order.indexOf(b.group))
-    traces.push({
-        x:rnaGene.map(d=>d.group),
-        y:rnaGene.map(d=>d["Z-score"]),
-        type:"box",
-        name:"RNA",
-        marker:{color:"#d5af34"},
-        xaxis: traces.length === 0 ? 'x' : 'x2',
-        yaxis: traces.length === 0 ? 'y' : 'y2'
-    })
-} else {
-    alert("Gene not found in RNA dataset")
-}
+    if(protGene.length > 0){
+        protGene.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+        traces.push({
+            x: protGene.map(d => d.group),
+            y: protGene.map(d => d["Z-score"]),
+            type: "box",
+            name: "Protein",
+            marker: {color: "#8281be"}
+        });
+    }
 
-if(protGene.length > 0){
-    const order = ['Posterior', 'Anterior', 'Somite']
-    protGene.sort((a,b) => order.indexOf(a.group) - order.indexOf(b.group))
-    traces.push({
-        x:protGene.map(d=>d.group),
-        y:protGene.map(d=>d["Z-score"]),
-        type:"box",
-        name:"Protein",
-        marker:{color:"#8281be"},
-        xaxis: traces.length === 0 ? 'x' : 'x2',
-        yaxis: traces.length === 0 ? 'y' : 'y2'
-    })
-} else {
-    alert("Gene not found in Protein dataset")
-}
+    if(traces.length === 2){
+        layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
+        layout.xaxis = {title: 'Group'};
+        layout.yaxis = {title: 'Z-score'};
+        layout.xaxis2 = {title: 'Group'};
+        layout.yaxis2 = {title: 'Z-score'};
+        traces[0].xaxis = 'x';
+        traces[0].yaxis = 'y';
+        traces[1].xaxis = 'x2';
+        traces[1].yaxis = 'y2';
+    } else {
+        layout.xaxis = {title: 'Group'};
+        layout.yaxis = {title: 'Z-score'};
+    }
 
-if(traces.length === 2){
-    layout.grid = {rows: 2, columns: 1, pattern: 'independent'}
-    layout.xaxis = {title: 'Group'}
-    layout.yaxis = {title: 'Z-score RNA'}
-    layout.xaxis2 = {title: 'Group'}
-    layout.yaxis2 = {title: 'Z-score Protein'}
-} else if(traces.length === 1){
-    // Single plot
-    traces[0].xaxis = 'x'
-    traces[0].yaxis = 'y'
-    layout.xaxis = {title: 'Group'}
-    layout.yaxis = {title: 'Z-score ' + traces[0].name}
-}
-
-Plotly.newPlot("plot", traces, layout)
-
+    Plotly.newPlot("plot", traces, layout);
 }
 
 function plotTemporal(){
-
-if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
-    alert("Data is still loading. Please wait a moment and try again.");
-    return;
-}
-
-const gene =
-document
-.getElementById("temporalGene")
-.value
-.trim()
-.toLowerCase()
-
-const region =
-document
-.getElementById("region")
-.value
-
-const rnaGene =
-RNA_DATA.filter(
-d=>d.ID &&
-String(d.ID).toLowerCase()===gene &&
-d.region &&
-d.region.toLowerCase() === region.toLowerCase() &&
-d.time >= 0
-)
-
-const protGene =
-PROT_DATA.filter(
-d=>d.ID &&
-String(d.ID).toLowerCase()===gene &&
-d.region &&
-d.region.toLowerCase() === region.toLowerCase() &&
-d.time >= 0
-)
-
-if(rnaGene.length===0 && protGene.length===0){
-alert("Gene not found in selected region")
-return
-}
-
-let traces = []
-let layout = {
-title:`Spatiotemporal Expression - ${region}`,
-template:"simple_white",
-height: 600,
-width: 800
-}
-
-if(rnaGene.length > 0){
-    // Group by time
-    const times = [...new Set(rnaGene.map(d=>d.time))].sort()
-    times.forEach(time => {
-        const yVals = rnaGene.filter(d=>d.time === time).map(d=>d["Z-score"])
-        traces.push({
-            x: [time],
-            y: yVals,
-            type: "box",
-            name: `RNA ${time}min`,
-            marker: {color: "#d5af34"},
-            xaxis: traces.length === 0 ? 'x' : 'x2',
-            yaxis: traces.length === 0 ? 'y' : 'y2'
-        })
-    })
-    // Stripplot
-    traces.push({
-        x: rnaGene.map(d=>d.time),
-        y: rnaGene.map(d=>d["Z-score"]),
-        mode: "markers",
-        type: "scatter",
-        name: "RNA points",
-        marker: {color: "#d5af34", size: 6},
-        xaxis: traces.length === 0 ? 'x' : 'x2',
-        yaxis: traces.length === 0 ? 'y' : 'y2'
-    })
-} else {
-    alert("Gene not found in RNA dataset")
-}
-
-if(protGene.length > 0){
-    const times = [...new Set(protGene.map(d=>d.time))].sort()
-    times.forEach(time => {
-        const yVals = protGene.filter(d=>d.time === time).map(d=>d["Z-score"])
-        traces.push({
-            x: [time],
-            y: yVals,
-            type: "box",
-            name: `Protein ${time}min`,
-            marker: {color: "#8281be"},
-            xaxis: traces.length === 0 ? 'x' : 'x2',
-            yaxis: traces.length === 0 ? 'y' : 'y2'
-        })
-    })
-    traces.push({
-        x: protGene.map(d=>d.time),
-        y: protGene.map(d=>d["Z-score"]),
-        mode: "markers",
-        type: "scatter",
-        name: "Protein points",
-        marker: {color: "#8281be", size: 6},
-        xaxis: traces.length === 0 ? 'x' : 'x2',
-        yaxis: traces.length === 0 ? 'y' : 'y2'
-    })
-} else {
-    alert("Gene not found in Protein dataset")
-}
-
-if(traces.length > 0){
-    layout.xaxis = {title: 'Time (minutes)', type: 'category'}
-    layout.yaxis = {title: 'Z-score RNA'}
-    if(traces.some(t=>t.xaxis === 'x2')){
-        layout.xaxis2 = {title: 'Time (minutes)', type: 'category'}
-        layout.yaxis2 = {title: 'Z-score Protein'}
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        return;
     }
-}
 
-Plotly.newPlot("plot", traces, layout)
+    const gene = document.getElementById("temporalGene").value.trim().toLowerCase();
+    const region = document.getElementById("region").value;
 
+    const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
+    const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
+
+    if(rnaGene.length === 0 && protGene.length === 0){
+        alert("Gene not found in selected region");
+        return;
+    }
+
+    const traces = [];
+    const layout = {
+        title: `Spatiotemporal Expression - ${region}`,
+        template: "simple_white",
+        height: 600,
+        width: 800,
+        showlegend: false
+    };
+
+    if(rnaGene.length > 0){
+        const times = [30, 60, 90, 120];
+        times.forEach(time => {
+            const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
+            if(yVals.length > 0){
+                traces.push({
+                    x: [time],
+                    y: yVals,
+                    type: "box",
+                    marker: {color: "#d5af34"}
+                });
+            }
+        });
+        // Stripplot
+        traces.push({
+            x: rnaGene.map(d => d.time),
+            y: rnaGene.map(d => d.value),
+            mode: "markers",
+            type: "scatter",
+            marker: {color: "#d5af34", size: 6}
+        });
+    }
+
+    if(protGene.length > 0){
+        const times = [30, 60, 90, 120];
+        times.forEach(time => {
+            const yVals = protGene.filter(d => d.time === time).map(d => d.value);
+            if(yVals.length > 0){
+                traces.push({
+                    x: [time],
+                    y: yVals,
+                    type: "box",
+                    marker: {color: "#8281be"}
+                });
+            }
+        });
+        traces.push({
+            x: protGene.map(d => d.time),
+            y: protGene.map(d => d.value),
+            mode: "markers",
+            type: "scatter",
+            marker: {color: "#8281be", size: 6}
+        });
+    }
+
+    if(traces.length > 0){
+        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis = {title: rnaGene.length > 0 ? 'Normalized Count' : 'LFQ'};
+        if(traces.some(t => t.type === 'box' && traces.indexOf(t) > (rnaGene.length > 0 ? 5 : 0))){  // Assuming RNA has 5 traces (4 boxes + strip), then protein
+            layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
+            layout.xaxis2 = {title: 'Time (minutes)', type: 'category'};
+            layout.yaxis2 = {title: 'LFQ'};
+            // Assign axes
+            let rnaTraces = traces.slice(0, rnaGene.length > 0 ? 5 : 0);
+            let protTraces = traces.slice(rnaTraces.length);
+            rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
+            protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
+        }
+    }
+
+    Plotly.newPlot("plot", traces, layout);
 }
 
 function plotSpatialHeatmap(){
-
-if(RNA_DATA.length === 0){
-    alert("Data is still loading. Please wait a moment and try again.");
-    return;
-}
-
-const genesText =
-document
-.getElementById("spatialGenes")
-.value
-.trim()
-
-if(!genesText){
-alert("Enter genes")
-return
-}
-
-const genes = genesText.split(',').map(g=>g.trim().toLowerCase()).filter(g=>g)
-
-const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort((a,b) => {
-    const order = ['Posterior', 'Anterior', 'Somite'];
-    return order.indexOf(a) - order.indexOf(b);
-})
-
-const matrixRNA = []
-const matrixProt = []
-const geneLabels = []
-
-genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene)
-    const protGene = PROT_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene)
-    if(rnaGene.length > 0){
-        const rowRNA = groups.map(group => {
-            const entry = rnaGene.find(d=>d.group === group)
-            return entry ? entry["Z-score"] : 0
-        })
-        matrixRNA.push(rowRNA)
-        const rowProt = groups.map(group => {
-            const entry = protGene.find(d=>d.group === group)
-            return entry ? entry["Z-score"] : 0
-        })
-        matrixProt.push(rowProt)
-        geneLabels.push(rnaGene[0].ID)
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        return;
     }
-})
 
-if(matrixRNA.length === 0){
-alert("No valid genes found")
-return
-}
-
-const data = [
-    {
-        z: matrixRNA,
-        x: groups,
-        y: geneLabels,
-        type: "heatmap",
-        colorscale: "Viridis",
-        xaxis: 'x',
-        yaxis: 'y',
-        name: 'RNA'
-    },
-    {
-        z: matrixProt,
-        x: groups,
-        y: geneLabels,
-        type: "heatmap",
-        colorscale: "Viridis",
-        xaxis: 'x2',
-        yaxis: 'y2',
-        name: 'Protein'
+    const genesText = document.getElementById("spatialGenes").value.trim();
+    if(!genesText){
+        alert("Enter genes");
+        return;
     }
-]
 
-const layout = {
-    title: "Spatial Expression Heatmap",
-    grid: {rows: 1, columns: 2, pattern: 'independent'},
-    xaxis: {title: 'Group', type: 'category'},
-    yaxis: {title: 'Genes'},
-    xaxis2: {title: 'Group', type: 'category'},
-    yaxis2: {title: 'Genes'},
-    height: 600,
-    width: 1000
-}
+    const genes = genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g);
+    const groups = ['Posterior', 'Anterior', 'Somite'];
 
-Plotly.newPlot("plot", data, layout)
+    const matrixRNA = [];
+    const matrixProt = [];
+    const geneLabels = [];
 
+    genes.forEach(gene => {
+        const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
+        const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
+        if(rnaGene.length > 0 || protGene.length > 0){
+            const rowRNA = groups.map(group => {
+                const entry = rnaGene.find(d => d.group === group);
+                return entry ? entry["Z-score"] : NaN;
+            });
+            matrixRNA.push(rowRNA);
+            const rowProt = groups.map(group => {
+                const entry = protGene.find(d => d.group === group);
+                return entry ? entry["Z-score"] : NaN;
+            });
+            matrixProt.push(rowProt);
+            geneLabels.push(rnaGene[0]?.ID || protGene[0]?.ID);
+        }
+    });
+
+    if(matrixRNA.length === 0 && matrixProt.length === 0){
+        alert("No valid genes found");
+        return;
+    }
+
+    const data = [];
+    if(matrixRNA.some(row => row.some(v => !isNaN(v)))){
+        data.push({
+            z: matrixRNA,
+            x: groups,
+            y: geneLabels,
+            type: "heatmap",
+            colorscale: "Viridis",
+            xaxis: 'x',
+            yaxis: 'y'
+        });
+    }
+    if(matrixProt.some(row => row.some(v => !isNaN(v)))){
+        data.push({
+            z: matrixProt,
+            x: groups,
+            y: geneLabels,
+            type: "heatmap",
+            colorscale: "Viridis",
+            xaxis: data.length === 0 ? 'x' : 'x2',
+            yaxis: data.length === 0 ? 'y' : 'y2'
+        });
+    }
+
+    const layout = {
+        title: "Spatial Expression Heatmap",
+        height: 600,
+        width: 1000,
+        annotations: []
+    };
+
+    if(data.length === 2){
+        layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
+        layout.xaxis = {title: 'Group', type: 'category'};
+        layout.yaxis = {title: 'Genes'};
+        layout.xaxis2 = {title: 'Group', type: 'category'};
+        layout.yaxis2 = {title: 'Genes'};
+        layout.annotations = [
+            {
+                text: "RNA",
+                x: 0.25,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            },
+            {
+                text: "Protein",
+                x: 0.75,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            }
+        ];
+    } else {
+        layout.xaxis = {title: 'Group', type: 'category'};
+        layout.yaxis = {title: 'Genes'};
+        layout.annotations = [
+            {
+                text: data[0] ? "RNA" : "Protein",
+                x: 0.5,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            }
+        ];
+    }
+
+    Plotly.newPlot("plot", data, layout);
 }
 
 function plotTemporalHeatmap(){
-
-if(RNA_DATA.length === 0){
-    alert("Data is still loading. Please wait a moment and try again.");
-    return;
-}
-
-const genesText =
-document
-.getElementById("temporalGenes")
-.value
-.trim()
-
-if(!genesText){
-alert("Enter genes")
-return
-}
-
-const region =
-document
-.getElementById("heatmapRegion")
-.value
-
-const genes = genesText.split(',').map(g=>g.trim().toLowerCase()).filter(g=>g)
-
-const matrix = []
-const geneLabels = []
-
-genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
-
-    if(rnaGene.length > 0){
-        const times = [...new Set(rnaGene.map(d=>d.time))].sort()
-        const timeLabels = times.map(t => t)
-        const row = times.map(time => {
-            const entry = rnaGene.find(d=>d.time === time)
-            return entry ? entry["Z-score"] : 0
-        })
-        matrix.push(row)
-        geneLabels.push(rnaGene[0].ID)
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        return;
     }
-})
 
-if(matrix.length === 0){
-alert("No valid genes found in selected region")
-return
-}
+    const genesText = document.getElementById("temporalGenes").value.trim();
+    if(!genesText){
+        alert("Enter genes");
+        return;
+    }
 
-const times = [...new Set(RNA_DATA.filter(d=>d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d=>d.time))].sort()
-const timeLabels = times.map(t => t)
+    const region = document.getElementById("heatmapRegion").value;
+    const genes = genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g);
+    const times = [30, 60, 90, 120];
 
-heatmap(matrix, geneLabels, timeLabels)
+    const matrixRNA = [];
+    const matrixProt = [];
+    const geneLabels = [];
 
+    genes.forEach(gene => {
+        const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
+        const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
+
+        if(rnaGene.length > 0 || protGene.length > 0){
+            // Compute Z-scores for RNA
+            if(rnaGene.length > 0){
+                const allValues = rnaGene.map(d => d.value);
+                const mean = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+                const std = Math.sqrt(allValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allValues.length);
+                const rowRNA = times.map(time => {
+                    const entry = rnaGene.find(d => d.time === time);
+                    return entry ? (entry.value - mean) / std : NaN;
+                });
+                matrixRNA.push(rowRNA);
+            } else {
+                matrixRNA.push(times.map(() => NaN));
+            }
+
+            // Compute Z-scores for Protein
+            if(protGene.length > 0){
+                const allValues = protGene.map(d => d.value);
+                const mean = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+                const std = Math.sqrt(allValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / allValues.length);
+                const rowProt = times.map(time => {
+                    const entry = protGene.find(d => d.time === time);
+                    return entry ? (entry.value - mean) / std : NaN;
+                });
+                matrixProt.push(rowProt);
+            } else {
+                matrixProt.push(times.map(() => NaN));
+            }
+
+            geneLabels.push(rnaGene[0]?.ID || protGene[0]?.ID);
+        }
+    });
+
+    if(matrixRNA.length === 0 && matrixProt.length === 0){
+        alert("No valid genes found in selected region");
+        return;
+    }
+
+    const data = [];
+    if(matrixRNA.some(row => row.some(v => !isNaN(v)))){
+        data.push({
+            z: matrixRNA,
+            x: times,
+            y: geneLabels,
+            type: "heatmap",
+            colorscale: "Viridis",
+            xaxis: 'x',
+            yaxis: 'y'
+        });
+    }
+    if(matrixProt.some(row => row.some(v => !isNaN(v)))){
+        data.push({
+            z: matrixProt,
+            x: times,
+            y: geneLabels,
+            type: "heatmap",
+            colorscale: "Viridis",
+            xaxis: data.length === 0 ? 'x' : 'x2',
+            yaxis: data.length === 0 ? 'y' : 'y2'
+        });
+    }
+
+    const layout = {
+        title: `Spatiotemporal Expression Heatmap - ${region}`,
+        height: 600,
+        width: 1000,
+        annotations: []
+    };
+
+    if(data.length === 2){
+        layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
+        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis = {title: 'Genes'};
+        layout.xaxis2 = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis2 = {title: 'Genes'};
+        layout.annotations = [
+            {
+                text: "RNA",
+                x: 0.25,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            },
+            {
+                text: "Protein",
+                x: 0.75,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            }
+        ];
+    } else {
+        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis = {title: 'Genes'};
+        layout.annotations = [
+            {
+                text: data[0] ? "RNA" : "Protein",
+                x: 0.5,
+                y: 1.05,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 16}
+            }
+        ];
+    }
+
+    Plotly.newPlot("plot", data, layout);
 }

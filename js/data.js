@@ -53,14 +53,14 @@ for (const file of rnaFiles) {
     const times = [30, 60, 90, 120]
     data.forEach(row => {
         times.forEach(time => {
-            const zscore = row[`TP_${time}_REP_1`]
-            if (zscore !== undefined && zscore !== null) {
+            const value = row[`TP_${time}_REP_1`]
+            if (value !== undefined && value !== null) {
                 RNA_DATA.push({
                     ID: row.ID,
                     region: file.region,
                     group: file.region,
                     time: time,
-                    "Z-score": zscore
+                    value: value
                 })
             }
         })
@@ -87,14 +87,14 @@ for (const file of protFiles) {
     const times = [30, 60, 90, 120]
     data.forEach(row => {
         times.forEach(time => {
-            const zscore = row[`TP_${time}_REP_1`]
-            if (zscore !== undefined && zscore !== null) {
+            const value = row[`TP_${time}_REP_1`]
+            if (value !== undefined && value !== null) {
                 PROT_DATA.push({
                     ID: row.ID,
                     region: file.region,
                     group: file.region,
                     time: time,
-                    "Z-score": zscore
+                    value: value
                 })
             }
         })
