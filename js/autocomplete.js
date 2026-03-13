@@ -25,7 +25,7 @@ function populateDatalist(id, list){
 
 function updateTemporalGenes(){
     const region = document.getElementById('region').value || document.getElementById('heatmapRegion').value;
-    geneListTemporal = [...new Set(RNA_DATA.filter(d => d.group === region && d.time >= 0).map(d => d.Gene).filter(g => g))].sort();
+    geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.Gene).filter(g => g))].sort();
     populateDatalist('genes-temporal', geneListTemporal);
 }
 

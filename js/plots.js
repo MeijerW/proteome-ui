@@ -97,7 +97,8 @@ const rnaGene =
 RNA_DATA.filter(
 d=>d.Gene &&
 d.Gene.toLowerCase()===gene &&
-d.group === region &&
+d.region &&
+d.region.toLowerCase() === region.toLowerCase() &&
 d.time >= 0
 )
 
@@ -105,7 +106,8 @@ const protGene =
 PROT_DATA.filter(
 d=>d.Gene &&
 d.Gene.toLowerCase()===gene &&
-d.group === region &&
+d.region &&
+d.region.toLowerCase() === region.toLowerCase() &&
 d.time >= 0
 )
 
@@ -185,13 +187,17 @@ return
 
 const genes = genesText.split(',').map(g=>g.trim().toLowerCase()).filter(g=>g)
 
+const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort((a,b) => {
+    const order = ['Posterior', 'Anterior', 'Somite'];
+    return order.indexOf(a) - order.indexOf(b);
+})
+
 const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
     const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene)
     if(rnaGene.length > 0){
-        const groups = [...new Set(rnaGene.map(d=>d.group))].sort()
         const row = groups.map(group => {
             const entry = rnaGene.find(d=>d.group === group)
             return entry ? entry["Z-score"] : 0
@@ -205,11 +211,6 @@ if(matrix.length === 0){
 alert("No valid genes found")
 return
 }
-
-const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort((a,b) => {
-    const order = ['Posterior', 'Anterior', 'Somite'];
-    return order.indexOf(a) - order.indexOf(b);
-})
 
 heatmap(matrix, geneLabels, groups)
 
@@ -239,7 +240,7 @@ const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.group === region && d.time >= 0)
+    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
     if(rnaGene.length > 0){
         const times = [...new Set(rnaGene.map(d=>d.time))].sort()
         const timeLabels = times.map(t => (t + 1) * 30)
@@ -257,7 +258,7 @@ alert("No valid genes found in selected region")
 return
 }
 
-const times = [...new Set(RNA_DATA.filter(d=>d.group === region && d.time >= 0).map(d=>d.time))].sort()
+const times = [...new Set(RNA_DATA.filter(d=>d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d=>d.time))].sort()
 const timeLabels = times.map(t => (t + 1) * 30)
 
 heatmap(matrix, geneLabels, timeLabels)
