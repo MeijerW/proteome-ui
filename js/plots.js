@@ -15,13 +15,13 @@ document
 const rnaGene =
 RNA_DATA.filter(
 d=>d.ID &&
-d.ID.toLowerCase()===gene
+String(d.ID).toLowerCase()===gene
 )
 
 const protGene =
 PROT_DATA.filter(
 d=>d.ID &&
-d.ID.toLowerCase()===gene
+String(d.ID).toLowerCase()===gene
 )
 
 if(rnaGene.length===0 && protGene.length===0){
@@ -106,7 +106,7 @@ document
 const rnaGene =
 RNA_DATA.filter(
 d=>d.ID &&
-d.ID.toLowerCase()===gene &&
+String(d.ID).toLowerCase()===gene &&
 d.region &&
 d.region.toLowerCase() === region.toLowerCase() &&
 d.time >= 0
@@ -114,8 +114,8 @@ d.time >= 0
 
 const protGene =
 PROT_DATA.filter(
-d=>d.Gene &&
-d.Gene.toLowerCase()===gene &&
+d=>d.ID &&
+String(d.ID).toLowerCase()===gene &&
 d.region &&
 d.region.toLowerCase() === region.toLowerCase() &&
 d.time >= 0
@@ -211,7 +211,7 @@ const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.ID && d.ID.toLowerCase()===gene)
+    const rnaGene = RNA_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene)
     if(rnaGene.length > 0){
         const row = groups.map(group => {
             const entry = rnaGene.find(d=>d.group === group)
@@ -260,7 +260,7 @@ const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
+    const rnaGene = RNA_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
 
     if(rnaGene.length > 0){
         const times = [...new Set(rnaGene.map(d=>d.time))].sort()
@@ -270,7 +270,7 @@ genes.forEach(gene => {
             return entry ? entry["Z-score"] : 0
         })
         matrix.push(row)
-        geneLabels.push(rnaGene[0].Gene)
+        geneLabels.push(rnaGene[0].ID)
     }
 })
 
