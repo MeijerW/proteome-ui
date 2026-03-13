@@ -18,3 +18,27 @@ if(viewer==="temporal")
 temporalPlot(gene)
 
 }
+
+function showMainTab(id){
+
+document
+.querySelectorAll(".mainTab")
+.forEach(t=>t.style.display="none")
+
+document
+.getElementById(id)
+.style.display="block"
+
+}
+
+function showSubTab(id){
+
+document
+.querySelectorAll(".subTab")
+.forEach(t=>t.style.display="none")
+
+document
+.getElementById(id)
+.style.display="block"
+
+}
