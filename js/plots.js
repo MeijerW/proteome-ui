@@ -24,43 +24,58 @@ alert("Gene not found")
 return
 }
 
-const trace1={
-x:rnaGene.map(d=>d.group),
-y:rnaGene.map(d=>d["Z-score"]),
-type:"box",
-name:"RNA",
-marker:{color:"#d5af34"},
-xaxis: 'x',
-yaxis: 'y'
-}
-
-const trace2={
-x:protGene.map(d=>d.group),
-y:protGene.map(d=>d["Z-score"]),
-type:"box",
-name:"Protein",
-marker:{color:"#8281be"},
-xaxis: 'x2',
-yaxis: 'y2'
-}
-
-const layout = {
+let traces = []
+let layout = {
 title:"Spatial Expression",
 template:"simple_white",
 boxmode:"group",
-grid: {rows: 2, columns: 1, pattern: 'independent'},
-xaxis: {title: 'Group'},
-yaxis: {title: 'Z-score RNA'},
-xaxis2: {title: 'Group'},
-yaxis2: {title: 'Z-score Protein'},
-height: 600
+height: 800,
+width: 800
 }
 
-Plotly.newPlot(
-"plot",
-[trace1,trace2],
-layout
-)
+if(rnaGene.length > 0){
+    traces.push({
+        x:rnaGene.map(d=>d.group),
+        y:rnaGene.map(d=>d["Z-score"]),
+        type:"box",
+        name:"RNA",
+        marker:{color:"#d5af34"},
+        xaxis: traces.length === 0 ? 'x' : 'x2',
+        yaxis: traces.length === 0 ? 'y' : 'y2'
+    })
+} else {
+    alert("Gene not found in RNA dataset")
+}
+
+if(protGene.length > 0){
+    traces.push({
+        x:protGene.map(d=>d.group),
+        y:protGene.map(d=>d["Z-score"]),
+        type:"box",
+        name:"Protein",
+        marker:{color:"#8281be"},
+        xaxis: traces.length === 0 ? 'x' : 'x2',
+        yaxis: traces.length === 0 ? 'y' : 'y2'
+    })
+} else {
+    alert("Gene not found in Protein dataset")
+}
+
+if(traces.length === 2){
+    layout.grid = {rows: 2, columns: 1, pattern: 'independent'}
+    layout.xaxis = {title: 'Group'}
+    layout.yaxis = {title: 'Z-score RNA'}
+    layout.xaxis2 = {title: 'Group'}
+    layout.yaxis2 = {title: 'Z-score Protein'}
+} else if(traces.length === 1){
+    // Single plot
+    traces[0].xaxis = 'x'
+    traces[0].yaxis = 'y'
+    layout.xaxis = {title: 'Group'}
+    layout.yaxis = {title: 'Z-score ' + traces[0].name}
+}
+
+Plotly.newPlot("plot", traces, layout)
 
 }
 
@@ -99,44 +114,59 @@ alert("Gene not found in selected region")
 return
 }
 
-const trace1={
-x:rnaGene.map(d=> (d.time + 1) * 30 ),
-y:rnaGene.map(d=>d["Z-score"]),
-type:"scatter",
-mode:"lines+markers",
-name:"RNA",
-marker:{color:"#d5af34"},
-xaxis: 'x',
-yaxis: 'y'
-}
-
-const trace2={
-x:protGene.map(d=> (d.time + 1) * 30 ),
-y:protGene.map(d=>d["Z-score"]),
-type:"scatter",
-mode:"lines+markers",
-name:"Protein",
-marker:{color:"#8281be"},
-xaxis: 'x2',
-yaxis: 'y2'
-}
-
-const layout = {
+let traces = []
+let layout = {
 title:`Spatiotemporal Expression - ${region}`,
 template:"simple_white",
-grid: {rows: 2, columns: 1, pattern: 'independent'},
-xaxis: {title: 'Time (minutes)'},
-yaxis: {title: 'Z-score RNA'},
-xaxis2: {title: 'Time (minutes)'},
-yaxis2: {title: 'Z-score Protein'},
-height: 600
+height: 600,
+width: 800
 }
 
-Plotly.newPlot(
-"plot",
-[trace1,trace2],
-layout
-)
+if(rnaGene.length > 0){
+    traces.push({
+        x:rnaGene.map(d=> (d.time + 1) * 30 ),
+        y:rnaGene.map(d=>d["Z-score"]),
+        type:"scatter",
+        mode:"lines+markers",
+        name:"RNA",
+        marker:{color:"#d5af34"},
+        xaxis: traces.length === 0 ? 'x' : 'x2',
+        yaxis: traces.length === 0 ? 'y' : 'y2'
+    })
+} else {
+    alert("Gene not found in RNA dataset")
+}
+
+if(protGene.length > 0){
+    traces.push({
+        x:protGene.map(d=> (d.time + 1) * 30 ),
+        y:protGene.map(d=>d["Z-score"]),
+        type:"scatter",
+        mode:"lines+markers",
+        name:"Protein",
+        marker:{color:"#8281be"},
+        xaxis: traces.length === 0 ? 'x' : 'x2',
+        yaxis: traces.length === 0 ? 'y' : 'y2'
+    })
+} else {
+    alert("Gene not found in Protein dataset")
+}
+
+if(traces.length === 2){
+    layout.grid = {rows: 2, columns: 1, pattern: 'independent'}
+    layout.xaxis = {title: 'Time (minutes)'}
+    layout.yaxis = {title: 'Z-score RNA'}
+    layout.xaxis2 = {title: 'Time (minutes)'}
+    layout.yaxis2 = {title: 'Z-score Protein'}
+} else if(traces.length === 1){
+    // Single plot
+    traces[0].xaxis = 'x'
+    traces[0].yaxis = 'y'
+    layout.xaxis = {title: 'Time (minutes)'}
+    layout.yaxis = {title: 'Z-score ' + traces[0].name}
+}
+
+Plotly.newPlot("plot", traces, layout)
 
 }
 
