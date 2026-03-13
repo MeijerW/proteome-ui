@@ -11,7 +11,8 @@ colorscale:"Viridis"
 }]
 
 Plotly.newPlot("plot",data,{
-title:"Expression Heatmap"
+title:"Expression Heatmap",
+height: 600
 })
 
 }

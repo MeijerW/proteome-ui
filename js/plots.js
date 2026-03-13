@@ -52,7 +52,8 @@ grid: {rows: 2, columns: 1, pattern: 'independent'},
 xaxis: {title: 'Group'},
 yaxis: {title: 'Z-score RNA'},
 xaxis2: {title: 'Group'},
-yaxis2: {title: 'Z-score Protein'}
+yaxis2: {title: 'Z-score Protein'},
+height: 600
 }
 
 Plotly.newPlot(
@@ -81,14 +82,16 @@ const rnaGene =
 RNA_DATA.filter(
 d=>d.Gene &&
 d.Gene.toLowerCase()===gene &&
-d.group === region
+d.group === region &&
+d.time >= 0
 )
 
 const protGene =
 PROT_DATA.filter(
 d=>d.Gene &&
 d.Gene.toLowerCase()===gene &&
-d.group === region
+d.group === region &&
+d.time >= 0
 )
 
 if(rnaGene.length===0 && protGene.length===0){
@@ -97,7 +100,7 @@ return
 }
 
 const trace1={
-x:rnaGene.map(d=>d.time),
+x:rnaGene.map(d=> (d.time + 1) * 30 ),
 y:rnaGene.map(d=>d["Z-score"]),
 type:"scatter",
 mode:"lines+markers",
@@ -108,7 +111,7 @@ yaxis: 'y'
 }
 
 const trace2={
-x:protGene.map(d=>d.time),
+x:protGene.map(d=> (d.time + 1) * 30 ),
 y:protGene.map(d=>d["Z-score"]),
 type:"scatter",
 mode:"lines+markers",
@@ -122,10 +125,11 @@ const layout = {
 title:`Spatiotemporal Expression - ${region}`,
 template:"simple_white",
 grid: {rows: 2, columns: 1, pattern: 'independent'},
-xaxis: {title: 'Time'},
+xaxis: {title: 'Time (minutes)'},
 yaxis: {title: 'Z-score RNA'},
-xaxis2: {title: 'Time'},
-yaxis2: {title: 'Z-score Protein'}
+xaxis2: {title: 'Time (minutes)'},
+yaxis2: {title: 'Z-score Protein'},
+height: 600
 }
 
 Plotly.newPlot(
@@ -172,7 +176,10 @@ alert("No valid genes found")
 return
 }
 
-const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort()
+const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort((a,b) => {
+    const order = ['Posterior', 'Anterior', 'Somite'];
+    return order.indexOf(a) - order.indexOf(b);
+})
 
 heatmap(matrix, geneLabels, groups)
 
@@ -202,9 +209,10 @@ const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
-    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.group === region)
+    const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.group === region && d.time >= 0)
     if(rnaGene.length > 0){
         const times = [...new Set(rnaGene.map(d=>d.time))].sort()
+        const timeLabels = times.map(t => (t + 1) * 30)
         const row = times.map(time => {
             const entry = rnaGene.find(d=>d.time === time)
             return entry ? entry["Z-score"] : 0
@@ -219,8 +227,9 @@ alert("No valid genes found in selected region")
 return
 }
 
-const times = [...new Set(RNA_DATA.filter(d=>d.group === region).map(d=>d.time))].sort()
+const times = [...new Set(RNA_DATA.filter(d=>d.group === region && d.time >= 0).map(d=>d.time))].sort()
+const timeLabels = times.map(t => (t + 1) * 30)
 
-heatmap(matrix, geneLabels, times)
+heatmap(matrix, geneLabels, timeLabels)
 
 }
