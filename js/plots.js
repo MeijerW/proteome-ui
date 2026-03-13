@@ -254,13 +254,19 @@ document
 .getElementById("heatmapRegion")
 .value
 
+console.log('Region:', region)
+console.log('RNA_DATA sample:', RNA_DATA.slice(0,3))
+
 const genes = genesText.split(',').map(g=>g.trim().toLowerCase()).filter(g=>g)
+
+console.log('Input genes:', genes)
 
 const matrix = []
 const geneLabels = []
 
 genes.forEach(gene => {
     const rnaGene = RNA_DATA.filter(d=>d.Gene && d.Gene.toLowerCase()===gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
+    console.log(`Gene ${gene}: ${rnaGene.length} entries`, rnaGene.slice(0,2))
     if(rnaGene.length > 0){
         const times = [...new Set(rnaGene.map(d=>d.time))].sort()
         const timeLabels = times.map(t => (t + 1) * 30)
@@ -273,6 +279,8 @@ genes.forEach(gene => {
     }
 })
 
+console.log('Matrix length:', matrix.length)
+
 if(matrix.length === 0){
 alert("No valid genes found in selected region")
 return
@@ -280,6 +288,8 @@ return
 
 const times = [...new Set(RNA_DATA.filter(d=>d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d=>d.time))].sort()
 const timeLabels = times.map(t => (t + 1) * 30)
+
+console.log('Times:', times, 'TimeLabels:', timeLabels)
 
 heatmap(matrix, geneLabels, timeLabels)
 

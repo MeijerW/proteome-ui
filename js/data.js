@@ -48,6 +48,11 @@ for (const file of protFiles) {
     PROT_DATA = PROT_DATA.concat(data)
 }
 
+console.log('RNA_DATA loaded:', RNA_DATA.length, 'samples')
+console.log('PROT_DATA loaded:', PROT_DATA.length, 'samples')
+console.log('RNA sample:', RNA_DATA[0])
+console.log('PROT sample:', PROT_DATA[0])
+
 }
 
 loadData()

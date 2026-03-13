@@ -1,12 +1,12 @@
 body{
-font-family:system-ui;
+font-family:"Inter var";
 margin:0;
-background: linear-gradient(to bottom, #f0f8ff, #e6f3ff);
+background: linear-gradient(to bottom, #006c7085, #ffffff);
 }
 
 .header{
-background:#1f2d3d;
-color:white;
+background:#006c70;
+color:#f5efe0;
 padding:25px;
 text-align:center;
 }
@@ -27,7 +27,7 @@ font-size:16px;
 }
 
 .tab-button.active{
-border-bottom:3px solid #2c7be5;
+border-bottom:3px solid #006c70;
 font-weight:bold;
 background:#e9ecef;
 }
@@ -46,7 +46,7 @@ border-radius:4px;
 }
 
 .subtab-button.active{
-background:#2c7be5;
+background:#006c70;
 color:white;
 }
 
@@ -87,7 +87,7 @@ input, textarea, select {
 
 button {
     padding: 12px 24px;
-    background: #007bff;
+    background: #006c70;
     color: white;
     border: none;
     border-radius: 8px;
@@ -98,5 +98,5 @@ button {
 }
 
 button:hover {
-    background: #0056b3;
+    background: #006c70;
 }
