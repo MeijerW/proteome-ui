@@ -1,30 +1,24 @@
 let geneList = []
 
 async function loadGenes(){
-
-let data = await loadCSV("RNA_preprocessed.csv")
-
-geneList =
-[...new Set(data.map(d => d.Gene))]
-
+    // Wait for data to load
+    while(RNA_DATA.length === 0){
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    geneList = [...new Set(RNA_DATA.map(d => d.Gene).filter(g => g))].sort();
+    populateDatalist();
 }
 
-function autocomplete(input){
-
-input.addEventListener("input",function(){
-
-let val = this.value.toLowerCase()
-
-let matches =
-geneList.filter(g =>
-g.toLowerCase().startsWith(val)
-)
-
-console.log(matches.slice(0,10))
-
-})
-
+function populateDatalist(){
+    const datalist = document.getElementById('genes');
+    if(datalist){
+        datalist.innerHTML = '';
+        geneList.forEach(gene => {
+            const option = document.createElement('option');
+            option.value = gene;
+            datalist.appendChild(option);
+        });
+    }
 }
 
-loadGenes()
-autocomplete(document.getElementById("geneInput"))
+loadGenes();

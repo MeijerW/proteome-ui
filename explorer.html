@@ -22,11 +22,11 @@
 
 <div class="main-tabs">
 
-<button class="tab-button active" onclick="openMainTab('spatial')">
+<button class="tab-button active" onclick="openMainTab('spatial', this)">
 Spatial Viewer
 </button>
 
-<button class="tab-button" onclick="openMainTab('temporal')">
+<button class="tab-button" onclick="openMainTab('temporal', this)">
 Spatiotemporal Viewer
 </button>
 
@@ -39,11 +39,11 @@ Spatiotemporal Viewer
 
 <div class="sub-tabs">
 
-<button class="subtab-button active" onclick="openSubTab('spatialSingle')">
+<button class="subtab-button active" onclick="openSubTab('spatialSingle', this)">
 Single Gene
 </button>
 
-<button class="subtab-button" onclick="openSubTab('spatialHeatmap')">
+<button class="subtab-button" onclick="openSubTab('spatialHeatmap', this)">
 Heatmap
 </button>
 
@@ -54,7 +54,7 @@ Heatmap
 
 <h3>Single Gene Spatial Expression</h3>
 
-<input id="spatialGene" placeholder="Enter gene (e.g. tbx6)">
+<input id="spatialGene" placeholder="Enter gene (e.g. tbx6)" list="genes">
 
 <button onclick="plotSpatial()">Plot</button>
 
@@ -82,11 +82,11 @@ placeholder="Enter genes separated by commas"></textarea>
 
 <div class="sub-tabs">
 
-<button class="subtab-button active" onclick="openSubTab('temporalSingle')">
+<button class="subtab-button active" onclick="openSubTab('temporalSingle', this)">
 Single Gene
 </button>
 
-<button class="subtab-button" onclick="openSubTab('temporalHeatmap')">
+<button class="subtab-button" onclick="openSubTab('temporalHeatmap', this)">
 Heatmap
 </button>
 
@@ -97,7 +97,7 @@ Heatmap
 
 <h3>Spatiotemporal Single Gene</h3>
 
-<input id="temporalGene">
+<input id="temporalGene" list="genes">
 
 <select id="region">
 
@@ -136,9 +136,14 @@ Heatmap
 <div id="plot"></div>
 
 
+<datalist id="genes"></datalist>
+
+
 <script src="js/data.js"></script>
 <script src="js/plots.js"></script>
+<script src="js/heatmap.js"></script>
 <script src="js/app.js"></script>
+<script src="js/autocomplete.js"></script>
 
 </body>
 
