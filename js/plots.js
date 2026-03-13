@@ -1,5 +1,10 @@
 function plotSpatial(){
 
+if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+    alert("Data is still loading. Please wait a moment and try again.");
+    return;
+}
+
 const gene =
 document
 .getElementById("spatialGene")
@@ -80,6 +85,11 @@ Plotly.newPlot("plot", traces, layout)
 }
 
 function plotTemporal(){
+
+if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+    alert("Data is still loading. Please wait a moment and try again.");
+    return;
+}
 
 const gene =
 document
@@ -174,6 +184,11 @@ Plotly.newPlot("plot", traces, layout)
 
 function plotSpatialHeatmap(){
 
+if(RNA_DATA.length === 0){
+    alert("Data is still loading. Please wait a moment and try again.");
+    return;
+}
+
 const genesText =
 document
 .getElementById("spatialGenes")
@@ -217,6 +232,11 @@ heatmap(matrix, geneLabels, groups)
 }
 
 function plotTemporalHeatmap(){
+
+if(RNA_DATA.length === 0){
+    alert("Data is still loading. Please wait a moment and try again.");
+    return;
+}
 
 const genesText =
 document
