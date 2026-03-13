@@ -6,7 +6,7 @@ background: #ffffff;
 
 .header{
 background:#006c70;
-color:#f5efe0;
+color:#ffffff;
 padding:25px;
 text-align:center;
 }
@@ -20,16 +20,17 @@ border-bottom:1px solid #ddd;
 .tab-button{
 padding:14px 20px;
 border:1px solid #ddd;
-border-bottom:none;
 background:white;
+color:#006c70;
 cursor:pointer;
 font-size:16px;
 }
 
 .tab-button.active{
-border-bottom:3px solid #006c70;
+border-bottom:3px solid #e9ecef;
 font-weight:bold;
-background:#e9ecef;
+background:#006c70;
+color:#ffffff;
 }
 
 .sub-tabs{
@@ -39,7 +40,8 @@ margin-top:20px;
 .subtab-button{
 padding:10px 16px;
 border:1px solid #ddd;
-background:white;
+color:#006c70;
+background:#ffffff;
 cursor:pointer;
 margin-right:10px;
 border-radius:4px;
@@ -47,7 +49,7 @@ border-radius:4px;
 
 .subtab-button.active{
 background:#006c70;
-color:white;
+color:#ffffff;
 }
 
 .main-tab-content{
@@ -88,7 +90,7 @@ input, textarea, select {
 button {
     padding: 12px 24px;
     background: #006c70;
-    color: white;
+    color: #000000;
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -99,10 +101,11 @@ button {
 
 button:hover {
     background: #005a5a;
+    color: #ffffff;
 }
 
 .hero {
-    height: auto;
+    height: 50vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -130,7 +133,7 @@ button:hover {
     display: inline-block;
     padding: 20px 40px;
     background: #006c70;
-    color: #f5efe0;
+    color: #ffffff;
     text-decoration: none;
     border-radius: 8px;
     font-size: 1.2rem;
@@ -148,6 +151,7 @@ button:hover {
     margin: 4rem auto;
     padding: 0 20px;
     text-align: center;
+    color: #ffffff
 }
 
 .info h2, .features h2 {
@@ -159,6 +163,7 @@ button:hover {
 .info p {
     font-size: 1.1rem;
     line-height: 1.6;
+    color: #ffffff
 }
 
 .features ul {
@@ -176,7 +181,7 @@ button:hover {
 
 footer {
     background: #006c70;
-    color: #f5efe0;
+    color: #ffffff;
     text-align: center;
     padding: 2rem;
     font-size: 0.9rem;
