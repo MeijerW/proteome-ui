@@ -1,56 +1,131 @@
-<!DOCTYPE html>
-<html>
-
-<head>
-
-<title>ProteomeUI Explorer</title>
-
-<link rel="stylesheet" href="css/style.css">
-
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
-<script src="https://cdn.jsdelivr.net/npm/ml-hclust"></script>
-
-</head>
-
 <body>
 
-<div class="toolbar">
+<div class="topbar">
 
-<input id="geneInput" placeholder="Enter gene">
+<h2>ProteomeUI Explorer</h2>
 
-<select id="viewer">
+</div>
 
-<option value="spatial">Spatial Viewer</option>
-<option value="spatialHeatmap">Spatial Heatmap</option>
-<option value="temporal">Spatiotemporal Viewer</option>
-<option value="temporalHeatmap">Spatiotemporal Heatmap</option>
 
-</select>
+<div class="tabs">
 
-<button onclick="runViewer()">
+<button onclick="showMainTab('spatial')">
+Spatial Viewer
+</button>
+
+<button onclick="showMainTab('temporal')">
+Spatiotemporal Viewer
+</button>
+
+</div>
+
+
+<!-- SPATIAL -->
+
+<div id="spatial" class="mainTab">
+
+<div class="subtabs">
+
+<button onclick="showSubTab('spatialSingle')">
+Single Gene
+</button>
+
+<button onclick="showSubTab('spatialHeatmap')">
+Heatmap
+</button>
+
+</div>
+
+
+<div id="spatialSingle" class="subTab">
+
+<h3>Single Gene Spatial Expression</h3>
+
+<input id="spatialGene" placeholder="Enter gene (e.g. tbx6)">
+
+<button onclick="plotSpatialSingle()">
 Plot
 </button>
 
-<button onclick="downloadFigure()">
-Download
+</div>
+
+
+<div id="spatialHeatmap" class="subTab">
+
+<h3>Spatial Heatmap</h3>
+
+<textarea id="spatialGenes" placeholder="Enter genes separated by commas"></textarea>
+
+<button onclick="plotSpatialHeatmap()">
+Generate Heatmap
+</button>
+
+</div>
+
+</div>
+
+
+<!-- SPATIOTEMPORAL -->
+
+<div id="temporal" class="mainTab">
+
+<div class="subtabs">
+
+<button onclick="showSubTab('temporalSingle')">
+Single Gene
+</button>
+
+<button onclick="showSubTab('temporalHeatmap')">
+Heatmap
 </button>
 
 </div>
 
 
-<div class="plot-area">
+<div id="temporalSingle" class="subTab">
 
-<div id="plot"></div>
+<h3>Single Gene Spatiotemporal Expression</h3>
+
+<input id="temporalGene">
+
+<select id="region">
+
+<option>Posterior</option>
+<option>Anterior</option>
+<option>Somite</option>
+
+</select>
+
+<button onclick="plotTemporalSingle()">
+Plot
+</button>
 
 </div>
 
-<script src="js/data.js"></script>
-<script src="js/plots.js"></script>
-<script src="js/heatmap.js"></script>
-<script src="js/autocomplete.js"></script>
-<script src="js/app.js"></script>
+
+<div id="temporalHeatmap" class="subTab">
+
+<h3>Spatiotemporal Heatmap</h3>
+
+<textarea id="temporalGenes"></textarea>
+
+<select id="heatmapRegion">
+
+<option>Posterior</option>
+<option>Anterior</option>
+<option>Somite</option>
+
+</select>
+
+<button onclick="plotTemporalHeatmap()">
+Generate Heatmap
+</button>
+
+</div>
+
+</div>
+
+
+<div id="plot"></div>
 
 </body>
-
-</html>
