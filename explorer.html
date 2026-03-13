@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>ProteomeUI Explorer</title>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<div class="toolbar">
+
+<input id="geneInput" placeholder="Enter gene (e.g. tbx6)">
+
+<button onclick="plotSpatial()">Spatial Plot</button>
+
+<button onclick="plotTemporal()">Temporal Plot</button>
+
+</div>
+
+<div id="plot"></div>
+
+<script src="explorer.js"></script>
+
+</body>
+
+</html>
