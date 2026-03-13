@@ -207,27 +207,68 @@ const groups = [...new Set(RNA_DATA.map(d=>d.group))].sort((a,b) => {
     return order.indexOf(a) - order.indexOf(b);
 })
 
-const matrix = []
+const matrixRNA = []
+const matrixProt = []
 const geneLabels = []
 
 genes.forEach(gene => {
     const rnaGene = RNA_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene)
+    const protGene = PROT_DATA.filter(d=>d.ID && String(d.ID).toLowerCase()===gene)
     if(rnaGene.length > 0){
-        const row = groups.map(group => {
+        const rowRNA = groups.map(group => {
             const entry = rnaGene.find(d=>d.group === group)
             return entry ? entry["Z-score"] : 0
         })
-        matrix.push(row)
+        matrixRNA.push(rowRNA)
+        const rowProt = groups.map(group => {
+            const entry = protGene.find(d=>d.group === group)
+            return entry ? entry["Z-score"] : 0
+        })
+        matrixProt.push(rowProt)
         geneLabels.push(rnaGene[0].ID)
     }
 })
 
-if(matrix.length === 0){
+if(matrixRNA.length === 0){
 alert("No valid genes found")
 return
 }
 
-heatmap(matrix, geneLabels, groups)
+const data = [
+    {
+        z: matrixRNA,
+        x: groups,
+        y: geneLabels,
+        type: "heatmap",
+        colorscale: "Viridis",
+        xaxis: 'x',
+        yaxis: 'y',
+        name: 'RNA'
+    },
+    {
+        z: matrixProt,
+        x: groups,
+        y: geneLabels,
+        type: "heatmap",
+        colorscale: "Viridis",
+        xaxis: 'x2',
+        yaxis: 'y2',
+        name: 'Protein'
+    }
+]
+
+const layout = {
+    title: "Spatial Expression Heatmap",
+    grid: {rows: 1, columns: 2, pattern: 'independent'},
+    xaxis: {title: 'Group'},
+    yaxis: {title: 'Genes'},
+    xaxis2: {title: 'Group'},
+    yaxis2: {title: 'Genes'},
+    height: 600,
+    width: 1000
+}
+
+Plotly.newPlot("plot", data, layout)
 
 }
 

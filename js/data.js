@@ -6,7 +6,26 @@ let PROT_DATA = []
 
 async function loadData(){
 
-// RNA files
+// Load spatial data from CSV
+const rnaCsv = await fetch(BASE+"RNA_preprocessed.csv")
+const rnaCsvText = await rnaCsv.text()
+const rnaCsvData = Papa.parse(rnaCsvText,{
+header:true,
+dynamicTyping:true,
+skipEmptyLines:true
+}).data
+RNA_DATA = rnaCsvData
+
+const protCsv = await fetch(BASE+"Protein_preprocessed.csv")
+const protCsvText = await protCsv.text()
+const protCsvData = Papa.parse(protCsvText,{
+header:true,
+dynamicTyping:true,
+skipEmptyLines:true
+}).data
+PROT_DATA = protCsvData
+
+// Load spatiotemporal data from TSV and add
 const rnaFiles = [
     {url: "Table-S5_Biocycle-results_RNAseq_a-PSM.tsv", region: "Anterior"},
     {url: "Table-S6_Biocycle-results_RNAseq_p-PSM.tsv", region: "Posterior"},
