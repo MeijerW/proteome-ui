@@ -178,13 +178,13 @@ function plotTemporal(){
     Plotly.newPlot("plot", traces, layout);
 }
 
-function plotSpatialHeatmap(){
+function plotSpatialHeatmap(overrideGenes){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
         return;
     }
 
-    const genesText = document.getElementById("spatialGenes").value.trim();
+    const genesText = overrideGenes ? overrideGenes.join(',') : document.getElementById("spatialGenes").value.trim();
     if(!genesText){
         alert("Enter genes");
         return;
@@ -296,19 +296,153 @@ function plotSpatialHeatmap(){
     Plotly.newPlot("plot", data, layout);
 }
 
-function plotTemporalHeatmap(){
+// GO term helpers
+const GO_TERM_GENES_CACHE = {};
+
+function getGoIdFromInput(inputValue){
+    const match = inputValue && inputValue.match(/(GO:\d{7})/i);
+    return match ? match[1].toUpperCase() : null;
+}
+
+async function searchGoTerm(forTemporal = false){
+    const inputId = forTemporal ? 'goTermInputTemporal' : 'goTermInput';
+    const statusId = forTemporal ? 'goSearchStatusTemporal' : 'goSearchStatus';
+    const input = document.getElementById(inputId).value.trim();
+    const statusEl = document.getElementById(statusId);
+
+    const goId = getGoIdFromInput(input);
+    if(goId){
+        statusEl.textContent = `Using GO term ${goId}. Click "Generate" to plot.`;
+        // Keep both input fields in sync
+        document.getElementById('goTermInput').value = goId;
+        document.getElementById('goTermInputTemporal').value = goId;
+        return goId;
+    }
+
+    if(!input){
+        statusEl.textContent = "Enter a GO term ID or keyword to search.";
+        return null;
+    }
+
+    statusEl.textContent = "Searching GO terms...";
+    const query = encodeURIComponent(input);
+    const url = `https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query=${query}&limit=20`;
+
+    try {
+        const resp = await fetch(url);
+        if(!resp.ok){
+            throw new Error(`HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        const datalist = document.getElementById('goTerms');
+        datalist.innerHTML = '';
+
+        if(!data.results || data.results.length === 0){
+            statusEl.textContent = "No GO terms found for that query.";
+            return null;
+        }
+
+        data.results.forEach(res => {
+            const opt = document.createElement('option');
+            opt.value = `${res.id} | ${res.name}`;
+            datalist.appendChild(opt);
+        });
+
+        statusEl.textContent = `Found ${data.numberOfHits} terms (showing ${data.results.length}). Select one from the dropdown.`;
+        document.getElementById(inputId).value = `${data.results[0].id} | ${data.results[0].name}`;
+        if(!forTemporal){
+            document.getElementById('goTermInputTemporal').value = document.getElementById(inputId).value;
+        } else {
+            document.getElementById('goTermInput').value = document.getElementById(inputId).value;
+        }
+        return getGoIdFromInput(document.getElementById(inputId).value);
+    } catch (err){
+        statusEl.textContent = `GO search failed: ${err.message}`;
+        return null;
+    }
+}
+
+async function fetchGoTermGenes(goId){
+    if(GO_TERM_GENES_CACHE[goId]){
+        return GO_TERM_GENES_CACHE[goId];
+    }
+
+    const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=500&aspect=biological_process,molecular_function,cellular_component`;
+    const resp = await fetch(url);
+    if(!resp.ok){
+        throw new Error(`HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const symbols = new Set();
+    (data.results || []).forEach(r => {
+        if(r.symbol) symbols.add(r.symbol.toLowerCase());
+        else if(r.geneProductId) symbols.add(r.geneProductId.toLowerCase());
+    });
+    const genes = Array.from(symbols);
+    GO_TERM_GENES_CACHE[goId] = genes;
+    return genes;
+}
+
+async function plotGoSpatialHeatmap(){
+    const goId = getGoIdFromInput(document.getElementById('goTermInput').value);
+    if(!goId){
+        alert('Please enter or select a valid GO term ID (e.g. GO:0007049).');
+        return;
+    }
+
+    const statusEl = document.getElementById('goSearchStatus');
+    statusEl.textContent = 'Loading gene list for ' + goId + '...';
+
+    try {
+        const genes = await fetchGoTermGenes(goId);
+        const geneCountEl = document.getElementById('goGeneCount');
+        geneCountEl.textContent = `Found ${genes.length} unique gene symbols (mouse) for ${goId}.`; 
+        document.getElementById('spatialGenes').value = genes.join(',');
+        statusEl.textContent = `Plotting ${genes.length} genes for GO term ${goId}...`;
+        plotSpatialHeatmap(genes);
+        statusEl.textContent = `Plotted ${genes.length} genes for GO term ${goId}.`;
+    } catch (err){
+        statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
+    }
+}
+
+async function plotGoTemporalHeatmap(){
+    const goId = getGoIdFromInput(document.getElementById('goTermInputTemporal').value);
+    if(!goId){
+        alert('Please enter or select a valid GO term ID (e.g. GO:0007049).');
+        return;
+    }
+
+    const statusEl = document.getElementById('goSearchStatusTemporal');
+    statusEl.textContent = 'Loading gene list for ' + goId + '...';
+
+    try {
+        const genes = await fetchGoTermGenes(goId);
+        const geneCountEl = document.getElementById('goGeneCountTemporal');
+        geneCountEl.textContent = `Found ${genes.length} unique gene symbols (mouse) for ${goId}.`;
+        document.getElementById('temporalGenes').value = genes.join(',');
+        statusEl.textContent = `Plotting ${genes.length} genes for GO term ${goId}...`;
+        const region = document.getElementById('goHeatmapRegion').value;
+        plotTemporalHeatmap(genes, region);
+        statusEl.textContent = `Plotted ${genes.length} genes for GO term ${goId}.`;
+    } catch (err){
+        statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
+    }
+}
+
+function plotTemporalHeatmap(overrideGenes, regionOverride){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
         return;
     }
 
-    const genesText = document.getElementById("temporalGenes").value.trim();
+    const genesText = overrideGenes ? overrideGenes.join(',') : document.getElementById("temporalGenes").value.trim();
     if(!genesText){
         alert("Enter genes");
         return;
     }
 
-    const region = document.getElementById("heatmapRegion").value;
+    const region = regionOverride || document.getElementById("heatmapRegion").value;
     const genes = genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g);
     const times = [30, 60, 90, 120];
 

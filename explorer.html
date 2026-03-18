@@ -31,6 +31,10 @@ Spatial Viewer
 Spatiotemporal Viewer
 </button>
 
+<button class="tab-button" onclick="openMainTab('go', this)">
+GO Term Browser
+</button>
+
 </div>
 
 
@@ -134,11 +138,66 @@ Heatmap
 </div>
 
 
+<!-- GO TERM TAB -->
+<div id="go" class="main-tab-content">
+
+<div class="sub-tabs">
+
+<button class="subtab-button active" onclick="openSubTab('goSpatial', this)">
+GO Spatial Heatmap
+</button>
+
+<button class="subtab-button" onclick="openSubTab('goTemporal', this)">
+GO Spatiotemporal Heatmap
+</button>
+
+</div>
+
+
+<div id="goSpatial" class="subtab-content active">
+
+<h3>GO Term Spatial Heatmap</h3>
+
+<label for="goTermInput">GO term (ID or keyword):</label>
+<input id="goTermInput" placeholder="e.g. GO:0007049 or cell cycle" list="goTerms">
+<button onclick="searchGoTerm()">Search GO term</button>
+<div id="goSearchStatus" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
+
+<button onclick="plotGoSpatialHeatmap()">Generate GO heatmap (Spatial)</button>
+<p id="goGeneCount" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
+
+</div>
+
+
+<div id="goTemporal" class="subtab-content">
+
+<h3>GO Term Spatiotemporal Heatmap</h3>
+
+<label for="goTermInputTemporal">GO term (ID or keyword):</label>
+<input id="goTermInputTemporal" placeholder="e.g. GO:0007049 or cell cycle" list="goTerms">
+<button onclick="searchGoTerm(true)">Search GO term</button>
+<div id="goSearchStatusTemporal" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
+
+<select id="goHeatmapRegion">
+<option>Posterior</option>
+<option>Anterior</option>
+<option>Somite</option>
+</select>
+
+<button onclick="plotGoTemporalHeatmap()">Generate GO heatmap (Spatiotemporal)</button>
+<p id="goGeneCountTemporal" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
+
+</div>
+
+</div>
+
+
 <div id="plot"></div>
 
 
 <datalist id="genes"></datalist>
 <datalist id="genes-temporal"></datalist>
+<datalist id="goTerms"></datalist>
 
 
 <script src="js/data.js"></script>
