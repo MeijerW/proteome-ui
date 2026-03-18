@@ -109,7 +109,7 @@ button:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #006c7085, #ffffff);
+    background: linear-gradient(135deg, #006c70, #ffffff);
     color: #333;
     text-align: center;
     padding: 0 20px;
