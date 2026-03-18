@@ -567,3 +567,10 @@ function plotTemporalHeatmap(overrideGenes, regionOverride){
 
     Plotly.newPlot("plot", data, layout);
 }
+
+// Expose key functions to the global scope (for inline onclick handlers)
+window.searchGoTerm = searchGoTerm;
+window.plotGoSpatialHeatmap = plotGoSpatialHeatmap;
+window.plotGoTemporalHeatmap = plotGoTemporalHeatmap;
+window.plotSpatialHeatmap = plotSpatialHeatmap;
+window.plotTemporal = plotTemporal;
