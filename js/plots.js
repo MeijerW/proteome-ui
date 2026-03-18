@@ -81,73 +81,98 @@ function plotTemporal(){
         return;
     }
 
-    const traces = [];
+    const rnaTraces = [];
+    const protTraces = [];
+    const times = [30, 60, 90, 120];
+
+    // RNA traces (box + points)
+    if(rnaGene.length > 0){
+        times.forEach((time, idx) => {
+            const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
+            if(yVals.length > 0){
+                rnaTraces.push({
+                    x: Array(yVals.length).fill(time),
+                    y: yVals,
+                    type: "box",
+                    name: "RNA",
+                    legendgroup: "RNA",
+                    showlegend: idx === 0,
+                    marker: {color: "#d5af34"},
+                    boxmean: true,
+                    boxpoints: false
+                });
+            }
+        });
+        // Stripplot points
+        rnaTraces.push({
+            x: rnaGene.map(d => d.time),
+            y: rnaGene.map(d => d.value),
+            mode: "markers",
+            type: "scatter",
+            name: "RNA points",
+            legendgroup: "RNA",
+            showlegend: false,
+            marker: {color: "#d5af34", size: 6, opacity: 0.8}
+        });
+    }
+
+    // Protein traces (box + points)
+    if(protGene.length > 0){
+        times.forEach((time, idx) => {
+            const yVals = protGene.filter(d => d.time === time).map(d => d.value);
+            if(yVals.length > 0){
+                protTraces.push({
+                    x: Array(yVals.length).fill(time),
+                    y: yVals,
+                    type: "box",
+                    name: "Protein",
+                    legendgroup: "Protein",
+                    showlegend: idx === 0,
+                    marker: {color: "#8281be"},
+                    boxmean: true,
+                    boxpoints: false
+                });
+            }
+        });
+        protTraces.push({
+            x: protGene.map(d => d.time),
+            y: protGene.map(d => d.value),
+            mode: "markers",
+            type: "scatter",
+            name: "Protein points",
+            legendgroup: "Protein",
+            showlegend: false,
+            marker: {color: "#8281be", size: 6, opacity: 0.8}
+        });
+    }
+
+    const traces = [...rnaTraces, ...protTraces];
+
     const layout = {
         title: `Spatiotemporal Expression - ${region}`,
         template: "simple_white",
         height: 600,
         width: 800,
-        showlegend: false
+        showlegend: true,
+        legend: { orientation: 'h', y: 1.1 }
     };
 
-    if(rnaGene.length > 0){
-        const times = [30, 60, 90, 120];
-        times.forEach(time => {
-            const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
-            if(yVals.length > 0){
-                traces.push({
-                    x: [time],
-                    y: yVals,
-                    type: "box",
-                    marker: {color: "#d5af34"}
-                });
-            }
-        });
-        // Stripplot
-        traces.push({
-            x: rnaGene.map(d => d.time),
-            y: rnaGene.map(d => d.value),
-            mode: "markers",
-            type: "scatter",
-            marker: {color: "#d5af34", size: 6}
-        });
-    }
-
-    if(protGene.length > 0){
-        const times = [30, 60, 90, 120];
-        times.forEach(time => {
-            const yVals = protGene.filter(d => d.time === time).map(d => d.value);
-            if(yVals.length > 0){
-                traces.push({
-                    x: [time],
-                    y: yVals,
-                    type: "box",
-                    marker: {color: "#8281be"}
-                });
-            }
-        });
-        traces.push({
-            x: protGene.map(d => d.time),
-            y: protGene.map(d => d.value),
-            mode: "markers",
-            type: "scatter",
-            marker: {color: "#8281be", size: 6}
-        });
-    }
-
-    if(traces.length > 0){
+    if(rnaTraces.length > 0 && protTraces.length > 0){
+        layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
         layout.xaxis = {title: 'Time (minutes)', type: 'category'};
-        layout.yaxis = {title: rnaGene.length > 0 ? 'Normalized Count' : 'LFQ'};
-        if(traces.some(t => t.type === 'box' && traces.indexOf(t) > (rnaGene.length > 0 ? 5 : 0))){  // Assuming RNA has 5 traces (4 boxes + strip), then protein
-            layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
-            layout.xaxis2 = {title: 'Time (minutes)', type: 'category'};
-            layout.yaxis2 = {title: 'LFQ'};
-            // Assign axes
-            let rnaTraces = traces.slice(0, rnaGene.length > 0 ? 5 : 0);
-            let protTraces = traces.slice(rnaTraces.length);
-            rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
-            protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
-        }
+        layout.yaxis = {title: 'Normalized Count', automargin: true};
+        layout.xaxis2 = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis2 = {title: 'LFQ', automargin: true};
+        rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
+        protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
+    } else if(rnaTraces.length > 0){
+        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis = {title: 'Normalized Count', automargin: true};
+        rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
+    } else if(protTraces.length > 0){
+        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.yaxis = {title: 'LFQ', automargin: true};
+        protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     }
 
     Plotly.newPlot("plot", traces, layout);

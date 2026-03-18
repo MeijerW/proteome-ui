@@ -49,22 +49,25 @@ for (const file of rnaFiles) {
         skipEmptyLines: true,
         delimiter: '\t'
     }).data
-    // Pivot to long format
-    const times = [30, 60, 90, 120]
+    // Pivot to long format (include all replicates per timepoint)
+    const times = [30, 60, 90, 120];
     data.forEach(row => {
         times.forEach(time => {
-            const value = row[`TP_${time}_REP_1`]
-            if (value !== undefined && value !== null) {
-                RNA_DATA.push({
-                    ID: row.ID,
-                    region: file.region,
-                    group: file.region,
-                    time: time,
-                    value: value
-                })
-            }
-        })
-    })
+            const repKeys = Object.keys(row).filter(k => k.startsWith(`TP_${time}_REP_`));
+            repKeys.forEach(key => {
+                const value = row[key];
+                if (value !== undefined && value !== null) {
+                    RNA_DATA.push({
+                        ID: row.ID,
+                        region: file.region,
+                        group: file.region,
+                        time: time,
+                        value: value
+                    });
+                }
+            });
+        });
+    });
 }
 
 // Protein files
@@ -83,22 +86,25 @@ for (const file of protFiles) {
         skipEmptyLines: true,
         delimiter: '\t'
     }).data
-    // Pivot to long format
-    const times = [30, 60, 90, 120]
+    // Pivot to long format (include all replicates per timepoint)
+    const times = [30, 60, 90, 120];
     data.forEach(row => {
         times.forEach(time => {
-            const value = row[`TP_${time}_REP_1`]
-            if (value !== undefined && value !== null) {
-                PROT_DATA.push({
-                    ID: row.ID,
-                    region: file.region,
-                    group: file.region,
-                    time: time,
-                    value: value
-                })
-            }
-        })
-    })
+            const repKeys = Object.keys(row).filter(k => k.startsWith(`TP_${time}_REP_`));
+            repKeys.forEach(key => {
+                const value = row[key];
+                if (value !== undefined && value !== null) {
+                    PROT_DATA.push({
+                        ID: row.ID,
+                        region: file.region,
+                        group: file.region,
+                        time: time,
+                        value: value
+                    });
+                }
+            });
+        });
+    });
 }
 
 }
