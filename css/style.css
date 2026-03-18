@@ -164,7 +164,7 @@ button:hover {
 .info p {
     font-size: 1.1rem;
     line-height: 1.6;
-    color: #ffffff
+    color: #000000
 }
 
 .features ul {
@@ -178,6 +178,7 @@ button:hover {
     padding: 1rem;
     border-radius: 8px;
     border-left: 5px solid #006c70;
+    color: #000000
 }
 
 footer {
