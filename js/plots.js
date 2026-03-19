@@ -364,23 +364,62 @@ async function searchGoTerm(forTemporal = false){
 
 async function fetchGoTermGenes(goId){
     if(GO_TERM_GENES_CACHE[goId]){
+        console.info(`[GO] Using cached genes for ${goId}: ${GO_TERM_GENES_CACHE[goId].length}`);
         return GO_TERM_GENES_CACHE[goId];
     }
 
-    const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=500`;
-    const resp = await fetch(url);
-    if(!resp.ok){
-        throw new Error(`HTTP ${resp.status}`);
-    }
-    const data = await resp.json();
+    const limit = 200; // QuickGO rejects larger limits (e.g. 500 -> HTTP 400)
     const symbols = new Set();
-    (data.results || []).forEach(r => {
-        if(r.symbol) symbols.add(r.symbol.toLowerCase());
-        else if(r.geneProductId) symbols.add(r.geneProductId.toLowerCase());
-    });
+    let page = 1;
+    let totalPages = 1;
+
+    console.groupCollapsed(`[GO] Fetching genes for ${goId}`);
+    while(page <= totalPages){
+        const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=${limit}&page=${page}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+        if(!resp.ok){
+            const body = await resp.text();
+            console.error(`[GO] QuickGO request failed for ${goId}`, { page, status: resp.status, body });
+            console.groupEnd();
+            throw new Error(`HTTP ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        const results = data.results || [];
+        results.forEach(r => {
+            if(r.symbol) symbols.add(r.symbol.toLowerCase());
+        });
+
+        const hits = Number(data.numberOfHits || results.length || 0);
+        totalPages = Math.max(1, Math.ceil(hits / limit));
+        console.info(`[GO] ${goId} page ${page}/${totalPages}: ${results.length} annotations, ${symbols.size} unique symbols so far`);
+        page += 1;
+    }
+
     const genes = Array.from(symbols);
     GO_TERM_GENES_CACHE[goId] = genes;
+    console.info(`[GO] Completed ${goId}: ${genes.length} unique symbols loaded`, genes.slice(0, 25));
+    console.groupEnd();
     return genes;
+}
+
+function getDatasetGeneSet(){
+    const genes = new Set();
+    RNA_DATA.forEach(d => {
+        if(d && d.ID) genes.add(String(d.ID).toLowerCase());
+    });
+    PROT_DATA.forEach(d => {
+        if(d && d.ID) genes.add(String(d.ID).toLowerCase());
+    });
+    return genes;
+}
+
+function inspectGoGenesForDataset(goId, genes){
+    const datasetGenes = getDatasetGeneSet();
+    const matched = genes.filter(g => datasetGenes.has(g));
+    const missing = genes.length - matched.length;
+    console.info(`[GO] ${goId}: ${genes.length} symbols loaded, ${matched.length} present in current dataset, ${missing} not present`);
+    return { matched, missing };
 }
 
 async function plotGoSpatialHeatmap(){
@@ -395,12 +434,17 @@ async function plotGoSpatialHeatmap(){
 
     try {
         const genes = await fetchGoTermGenes(goId);
+        const { matched, missing } = inspectGoGenesForDataset(goId, genes);
         const geneCountEl = document.getElementById('goGeneCount');
-        geneCountEl.textContent = `Found ${genes.length} unique gene symbols (mouse) for ${goId}.`; 
-        document.getElementById('spatialGenes').value = genes.join(',');
-        statusEl.textContent = `Plotting ${genes.length} genes for GO term ${goId}...`;
-        plotSpatialHeatmap(genes);
-        statusEl.textContent = `Plotted ${genes.length} genes for GO term ${goId}.`;
+        geneCountEl.textContent = `Found ${genes.length} GO symbols; ${matched.length} are present in this dataset (${missing} absent).`;
+        if(matched.length === 0){
+            statusEl.textContent = `Loaded GO genes for ${goId}, but none are present in the current dataset.`;
+            return;
+        }
+        document.getElementById('spatialGenes').value = matched.join(',');
+        statusEl.textContent = `Plotting ${matched.length} dataset-matched genes for GO term ${goId}...`;
+        plotSpatialHeatmap(matched);
+        statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
     } catch (err){
         statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
     }
@@ -418,13 +462,18 @@ async function plotGoTemporalHeatmap(){
 
     try {
         const genes = await fetchGoTermGenes(goId);
+        const { matched, missing } = inspectGoGenesForDataset(goId, genes);
         const geneCountEl = document.getElementById('goGeneCountTemporal');
-        geneCountEl.textContent = `Found ${genes.length} unique gene symbols (mouse) for ${goId}.`;
-        document.getElementById('temporalGenes').value = genes.join(',');
-        statusEl.textContent = `Plotting ${genes.length} genes for GO term ${goId}...`;
+        geneCountEl.textContent = `Found ${genes.length} GO symbols; ${matched.length} are present in this dataset (${missing} absent).`;
+        if(matched.length === 0){
+            statusEl.textContent = `Loaded GO genes for ${goId}, but none are present in the current dataset.`;
+            return;
+        }
+        document.getElementById('temporalGenes').value = matched.join(',');
+        statusEl.textContent = `Plotting ${matched.length} dataset-matched genes for GO term ${goId}...`;
         const region = document.getElementById('goHeatmapRegion').value;
-        plotTemporalHeatmap(genes, region);
-        statusEl.textContent = `Plotted ${genes.length} genes for GO term ${goId}.`;
+        plotTemporalHeatmap(matched, region);
+        statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
     } catch (err){
         statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
     }
