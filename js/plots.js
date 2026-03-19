@@ -367,7 +367,7 @@ async function fetchGoTermGenes(goId){
         return GO_TERM_GENES_CACHE[goId];
     }
 
-    const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=500&aspect=biological_process,molecular_function,cellular_component`;
+    const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=500`;
     const resp = await fetch(url);
     if(!resp.ok){
         throw new Error(`HTTP ${resp.status}`);
