@@ -73,6 +73,18 @@ Heatmap
 <textarea id="spatialGenes"
 placeholder="Enter genes separated by commas"></textarea>
 
+<label for="spatialGeneMembership">Gene set:</label>
+<select id="spatialGeneMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="spatialAggregation">Display mode:</label>
+<select id="spatialAggregation">
+<option value="average" selected>Average per region</option>
+<option value="samples">Individual samples (if available)</option>
+</select>
+
 <button onclick="plotSpatialHeatmap()">Generate Heatmap</button>
 
 </div>
@@ -123,6 +135,30 @@ Heatmap
 
 <textarea id="temporalGenes" list="genes-temporal" placeholder="Enter genes separated by commas"></textarea>
 
+<label for="temporalGeneMembership">Gene set:</label>
+<select id="temporalGeneMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="temporalAggregation">Display mode:</label>
+<select id="temporalAggregation">
+<option value="average" selected>Average per timepoint</option>
+<option value="samples">Individual samples (replicates)</option>
+</select>
+
+<div class="meta-controls">
+<span>Add metadata columns:</span>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="P_VALUE"> P_VALUE</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="Q_VALUE"> Q_VALUE</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="PERIOD"> PERIOD</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="LAG"> LAG</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="AMPLITUDE"> AMPLITUDE</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="OFFSET"> OFFSET</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="MEAN_PERIODICITY"> MEAN_PERIODICITY</label>
+<label><input type="checkbox" class="temporal-metric-checkbox" value="SCATTER"> SCATTER</label>
+</div>
+
 <select id="heatmapRegion">
 
 <option>Posterior</option>
@@ -163,6 +199,18 @@ GO Spatiotemporal Heatmap
 <button onclick="searchGoTerm()">Search GO term</button>
 <div id="goSearchStatus" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
 
+<label for="goSpatialGeneMembership">Gene set:</label>
+<select id="goSpatialGeneMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="goSpatialAggregation">Display mode:</label>
+<select id="goSpatialAggregation">
+<option value="average" selected>Average per region</option>
+<option value="samples">Individual samples (if available)</option>
+</select>
+
 <button onclick="plotGoSpatialHeatmap()">Generate GO heatmap (Spatial)</button>
 <p id="goGeneCount" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
 
@@ -178,6 +226,30 @@ GO Spatiotemporal Heatmap
 <button onclick="searchGoTerm(true)">Search GO term</button>
 <div id="goSearchStatusTemporal" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
 
+<label for="goTemporalGeneMembership">Gene set:</label>
+<select id="goTemporalGeneMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="goTemporalAggregation">Display mode:</label>
+<select id="goTemporalAggregation">
+<option value="average" selected>Average per timepoint</option>
+<option value="samples">Individual samples (replicates)</option>
+</select>
+
+<div class="meta-controls">
+<span>Add metadata columns:</span>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="P_VALUE"> P_VALUE</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="Q_VALUE"> Q_VALUE</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="PERIOD"> PERIOD</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="LAG"> LAG</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="AMPLITUDE"> AMPLITUDE</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="OFFSET"> OFFSET</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="MEAN_PERIODICITY"> MEAN_PERIODICITY</label>
+<label><input type="checkbox" class="go-temporal-metric-checkbox" value="SCATTER"> SCATTER</label>
+</div>
+
 <select id="goHeatmapRegion">
 <option>Posterior</option>
 <option>Anterior</option>
@@ -192,7 +264,10 @@ GO Spatiotemporal Heatmap
 </div>
 
 
+<div id="plotLayout">
 <div id="plot"></div>
+<div id="temporalStatsPanel" class="stats-panel"></div>
+</div>
 
 
 <datalist id="genes"></datalist>

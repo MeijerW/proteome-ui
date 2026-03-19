@@ -62,7 +62,16 @@ for (const file of rnaFiles) {
                         region: file.region,
                         group: file.region,
                         time: time,
-                        value: value
+                        sample: key,
+                        value: value,
+                        P_VALUE: row.P_VALUE,
+                        Q_VALUE: row.Q_VALUE,
+                        PERIOD: row.PERIOD,
+                        LAG: row.LAG,
+                        AMPLITUDE: row.AMPLITUDE,
+                        OFFSET: row.OFFSET,
+                        MEAN_PERIODICITY: row.MEAN_PERIODICITY,
+                        SCATTER: row.SCATTER
                     });
                 }
             });
@@ -99,7 +108,16 @@ for (const file of protFiles) {
                         region: file.region,
                         group: file.region,
                         time: time,
-                        value: value
+                        sample: key,
+                        value: value,
+                        P_VALUE: row.P_VALUE,
+                        Q_VALUE: row.Q_VALUE,
+                        PERIOD: row.PERIOD,
+                        LAG: row.LAG,
+                        AMPLITUDE: row.AMPLITUDE,
+                        OFFSET: row.OFFSET,
+                        MEAN_PERIODICITY: row.MEAN_PERIODICITY,
+                        SCATTER: row.SCATTER
                     });
                 }
             });
