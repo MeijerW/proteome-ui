@@ -730,11 +730,39 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     const matrixRNA = buildExprMatrix("RNA");
     const matrixProt = buildExprMatrix("Protein");
 
-    const metricColorScale = (metric) => (
-        metric === "P_VALUE" || metric === "Q_VALUE"
-            ? [[0, "#5b2a86"], [1, "#ffffff"]]
-            : "Plasma"
-    );
+    const metricColorScale = (metric) => {
+        if(metric === "P_VALUE" || metric === "Q_VALUE"){
+            return [[0, "#5b2a86"], [1, "#ffffff"]];
+        }
+        if(metric === "LAG"){
+            return [[0, "#0b3c5d"], [0.5, "#328cc1"], [1, "#d9b310"]];
+        }
+        if(metric === "PERIOD"){
+            // Ideal PERIOD is 130 min (distance=0); farther values shift away in color.
+            return [[0, "#2ca25f"], [0.5, "#fdd049"], [1, "#6a3d9a"]];
+        }
+        return "Plasma";
+    };
+
+    const getMetricZValues = (metric, metricValues) => {
+        if(metric === "PERIOD"){
+            return metricValues.map(v => Number.isNaN(v) ? NaN : Math.abs(v - 130));
+        }
+        return metricValues;
+    };
+
+    const getMetricScaleConfig = (metric) => {
+        if(metric === "P_VALUE" || metric === "Q_VALUE"){
+            return { zmin: 0, zmax: 1, zauto: false, colorbarTitle: metric };
+        }
+        if(metric === "LAG"){
+            return { zmin: 0, zmax: 120, zauto: false, colorbarTitle: "LAG (0-120 min)" };
+        }
+        if(metric === "PERIOD"){
+            return { zmin: 0, zmax: 70, zauto: false, colorbarTitle: "|PERIOD - 130| (min)" };
+        }
+        return { zmin: undefined, zmax: undefined, zauto: true, colorbarTitle: metric };
+    };
 
     const buildMetricColumn = (datasetKey, metric) => entries.map(e => {
         const rows = datasetKey === "RNA" ? e.rnaGene : e.protGene;
@@ -798,7 +826,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const domain = subDomains[i];
         const domainCenter = (domain[0] + domain[1]) / 2;
         const domainWidth = Math.max(0.05, domain[1] - domain[0]);
-        const colorbarLen = Math.max(0.06, domainWidth * 0.88);
+        const colorbarLen = domainWidth;
         const isExpression = slot.kind === "expr";
         const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
@@ -812,6 +840,8 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickvals: isExpression ? xDisplayLabels : undefined,
             ticktext: isExpression ? xDisplayLabels : undefined,
             showticklabels: isExpression,
+            ticks: '',
+            ticklen: 0,
             domain,
             anchor: yKey
         };
@@ -824,6 +854,8 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             ticktext: geneLabels,
             showticklabels: i === 0,
             tickfont: {size: yTickFontSize},
+            ticks: '',
+            ticklen: 0,
             domain: [0, 1],
             anchor: xKey,
             ticklabeloverflow: 'allow'
@@ -853,23 +885,28 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
+            const metricZValues = getMetricZValues(slot.metric, metricValues);
+            const scaleConfig = getMetricScaleConfig(slot.metric);
             traces.push({
-                z: metricValues.map(v => [v]),
+                z: metricZValues.map(v => [v]),
                 x: [slot.metric],
                 y: geneLabels,
                 type: "heatmap",
                 colorscale: metricColorScale(slot.metric),
                 xaxis: xKey,
                 yaxis: yKey,
-                zmin: isSignificanceMetric ? 0 : undefined,
-                zmax: isSignificanceMetric ? 1 : undefined,
-                zauto: isSignificanceMetric ? false : true,
+                zmin: scaleConfig.zmin,
+                zmax: scaleConfig.zmax,
+                zauto: scaleConfig.zauto,
                 text: metricValues.map(v => [formatMetricCell(v)]),
                 texttemplate: "%{text}",
-                textfont: {size: 9, color: "#111"},
-                hovertemplate: "%{y}<br>" + slot.metric + ": %{z}<extra></extra>",
+                textfont: {size: 10, color: "#111"},
+                customdata: metricValues.map(v => [v]),
+                hovertemplate: slot.metric === "PERIOD"
+                    ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
+                    : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
                 colorbar: {
-                    title: {text: slot.metric, side: 'bottom'},
+                    title: {text: scaleConfig.colorbarTitle, side: 'bottom'},
                     orientation: 'h',
                     x: domainCenter,
                     xanchor: 'center',
@@ -884,7 +921,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         layout.annotations.push({
             text: `<b>${slot.title}</b>`,
             x: domainCenter,
-            y: 1.02,
+            y: 1.045,
             xref: 'paper',
             yref: 'paper',
             showarrow: false,
