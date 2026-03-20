@@ -812,7 +812,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         title: `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: 40, t: 95, b: 185},
+        margin: {l: 230, r: 40, t: 95, b: 120},
         annotations: []
     };
 
@@ -826,7 +826,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const domain = subDomains[i];
         const domainCenter = (domain[0] + domain[1]) / 2;
         const domainWidth = Math.max(0.05, domain[1] - domain[0]);
-        const colorbarLen = domainWidth;
+        const colorbarLen = Math.max(0.08, Math.min(0.22, domainWidth * 0.9));
         const isExpression = slot.kind === "expr";
         const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
@@ -873,11 +873,11 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 zmin: -2,
                 zmax: 2,
                 colorbar: {
-                    title: {text: 'Z-score', side: 'bottom'},
-                    orientation: 'h',
+                    title: {text: 'Z-score', side: 'right'},
+                    orientation: 'v',
                     x: domainCenter,
                     xanchor: 'center',
-                    y: -0.34,
+                    y: -0.04,
                     yanchor: 'top',
                     len: colorbarLen,
                     thickness: 10
@@ -887,6 +887,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
             const metricZValues = getMetricZValues(slot.metric, metricValues);
             const scaleConfig = getMetricScaleConfig(slot.metric);
+            const metricText = metricValues.map(v => formatMetricCell(v));
             traces.push({
                 z: metricZValues.map(v => [v]),
                 x: [slot.metric],
@@ -898,7 +899,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 zmin: scaleConfig.zmin,
                 zmax: scaleConfig.zmax,
                 zauto: scaleConfig.zauto,
-                text: metricValues.map(v => [formatMetricCell(v)]),
+                text: metricText.map(v => [v]),
                 texttemplate: "%{text}",
                 textfont: {size: 10, color: "#111"},
                 customdata: metricValues.map(v => [v]),
@@ -906,24 +907,38 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
                 colorbar: {
-                    title: {text: scaleConfig.colorbarTitle, side: 'bottom'},
-                    orientation: 'h',
+                    title: {text: scaleConfig.colorbarTitle, side: 'right'},
+                    orientation: 'v',
                     x: domainCenter,
                     xanchor: 'center',
-                    y: -0.34,
+                    y: -0.04,
                     yanchor: 'top',
                     len: colorbarLen,
                     thickness: 10
                 }
             });
+
+            // Keep numeric values visible regardless of heatmap text rendering support
+            traces.push({
+                x: Array(geneLabels.length).fill(slot.metric),
+                y: geneLabels,
+                type: "scatter",
+                mode: "text",
+                text: metricText,
+                textfont: {size: 10, color: "#111"},
+                hoverinfo: "skip",
+                showlegend: false,
+                xaxis: xKey,
+                yaxis: yKey
+            });
         }
 
         layout.annotations.push({
             text: `<b>${slot.title}</b>`,
-            x: domainCenter,
-            y: 1.045,
-            xref: 'paper',
-            yref: 'paper',
+            x: 0.5,
+            y: 1.03,
+            xref: `${xKey} domain`,
+            yref: `${yKey} domain`,
             showarrow: false,
             font: {size: 13}
         });
