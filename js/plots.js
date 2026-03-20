@@ -357,7 +357,9 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         tickmode: 'array',
         tickvals: geneLabels,
         ticktext: geneLabels,
-        tickfont: {size: yTickFontSize}
+        tickfont: {size: yTickFontSize},
+        ticks: '',
+        ticklen: 0
     };
 
     const data = [];
@@ -394,40 +396,40 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     if(data.length === 2){
         layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
-        layout.xaxis = {title: 'Group', type: 'category'};
+        layout.xaxis = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
-        layout.xaxis2 = {title: 'Group', type: 'category'};
-        layout.yaxis2 = {...yAxisBase};
+        layout.xaxis2 = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
+        layout.yaxis2 = {...yAxisBase, title: '', showticklabels: false};
         layout.annotations = [
             {
                 text: "RNA",
-                x: 0.25,
-                y: 1.05,
-                xref: 'paper',
-                yref: 'paper',
+                x: 0.5,
+                y: 1.03,
+                xref: 'x domain',
+                yref: 'y domain',
                 showarrow: false,
                 font: {size: 16}
             },
             {
                 text: "Protein",
-                x: 0.75,
-                y: 1.05,
-                xref: 'paper',
-                yref: 'paper',
+                x: 0.5,
+                y: 1.03,
+                xref: 'x2 domain',
+                yref: 'y2 domain',
                 showarrow: false,
                 font: {size: 16}
             }
         ];
     } else {
-        layout.xaxis = {title: 'Group', type: 'category'};
+        layout.xaxis = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
         layout.annotations = [
             {
                 text: data[0] ? "RNA" : "Protein",
                 x: 0.5,
-                y: 1.05,
-                xref: 'paper',
-                yref: 'paper',
+                y: 1.03,
+                xref: 'x domain',
+                yref: 'y domain',
                 showarrow: false,
                 font: {size: 16}
             }
@@ -812,7 +814,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         title: `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: 40, t: 95, b: 120},
+        margin: {l: 230, r: 40, t: 95, b: 145},
         annotations: []
     };
 
@@ -826,7 +828,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const domain = subDomains[i];
         const domainCenter = (domain[0] + domain[1]) / 2;
         const domainWidth = Math.max(0.05, domain[1] - domain[0]);
-        const colorbarLen = Math.max(0.08, Math.min(0.22, domainWidth * 0.9));
+        const colorbarLen = domainWidth;
         const isExpression = slot.kind === "expr";
         const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
@@ -873,11 +875,11 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 zmin: -2,
                 zmax: 2,
                 colorbar: {
-                    title: {text: 'Z-score', side: 'right'},
-                    orientation: 'v',
+                    title: {text: 'Z-score', side: 'bottom'},
+                    orientation: 'h',
                     x: domainCenter,
                     xanchor: 'center',
-                    y: -0.04,
+                    y: -0.14,
                     yanchor: 'top',
                     len: colorbarLen,
                     thickness: 10
@@ -907,11 +909,11 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
                 colorbar: {
-                    title: {text: scaleConfig.colorbarTitle, side: 'right'},
-                    orientation: 'v',
+                    title: {text: scaleConfig.colorbarTitle, side: 'bottom'},
+                    orientation: 'h',
                     x: domainCenter,
                     xanchor: 'center',
-                    y: -0.04,
+                    y: -0.14,
                     yanchor: 'top',
                     len: colorbarLen,
                     thickness: 10
