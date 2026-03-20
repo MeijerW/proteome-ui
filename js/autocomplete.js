@@ -1,5 +1,7 @@
 let geneList = []
 let geneListTemporal = []
+let goAutocompleteTimer = null
+let goAutocompleteRequestId = 0
 
 async function loadGenes(){
     // Wait for data to load
@@ -32,4 +34,55 @@ function updateTemporalGenes(){
 document.getElementById('region').addEventListener('change', updateTemporalGenes);
 document.getElementById('heatmapRegion').addEventListener('change', updateTemporalGenes);
 
+function syncGoInputs(sourceId){
+    const source = document.getElementById(sourceId);
+    const otherId = sourceId === 'goTermInput' ? 'goTermInputTemporal' : 'goTermInput';
+    const other = document.getElementById(otherId);
+    if(source && other){
+        other.value = source.value;
+    }
+}
+
+function setupGoAutocomplete(){
+    const inputIds = ['goTermInput', 'goTermInputTemporal'];
+
+    const requestSuggestions = (sourceId) => {
+        const input = document.getElementById(sourceId);
+        if(!input || typeof window.fetchGoTermSuggestions !== 'function') return;
+
+        const query = input.value.trim();
+        syncGoInputs(sourceId);
+
+        if(query.length < 2){
+            if(query.length === 0 && typeof window.populateGoTermsDatalist === 'function'){
+                window.populateGoTermsDatalist([]);
+            }
+            return;
+        }
+
+        const requestId = ++goAutocompleteRequestId;
+        clearTimeout(goAutocompleteTimer);
+        goAutocompleteTimer = setTimeout(async () => {
+            try {
+                const data = await window.fetchGoTermSuggestions(query, 25);
+                if(requestId !== goAutocompleteRequestId) return;
+                if(typeof window.populateGoTermsDatalist === 'function'){
+                    window.populateGoTermsDatalist(data.results || []);
+                }
+            } catch (err){
+                console.warn('GO autocomplete failed:', err);
+            }
+        }, 250);
+    };
+
+    inputIds.forEach(id => {
+        const input = document.getElementById(id);
+        if(!input) return;
+        input.addEventListener('input', () => requestSuggestions(id));
+        input.addEventListener('focus', () => requestSuggestions(id));
+        input.addEventListener('change', () => syncGoInputs(id));
+    });
+}
+
 loadGenes();
+setupGoAutocomplete();

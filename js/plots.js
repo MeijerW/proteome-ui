@@ -445,6 +445,36 @@ function getGoIdFromInput(inputValue){
     return match ? match[1].toUpperCase() : null;
 }
 
+async function fetchGoTermSuggestions(query, limit = 20){
+    const trimmed = String(query || "").trim();
+    if(!trimmed) return { numberOfHits: 0, results: [] };
+
+    const encodedQuery = encodeURIComponent(trimmed);
+    const url = `https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query=${encodedQuery}&limit=${limit}`;
+    const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+    if(!resp.ok){
+        throw new Error(`HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    return {
+        numberOfHits: Number(data.numberOfHits || 0),
+        results: Array.isArray(data.results) ? data.results : []
+    };
+}
+
+function populateGoTermsDatalist(results){
+    const datalist = document.getElementById('goTerms');
+    if(!datalist) return;
+
+    datalist.innerHTML = '';
+    results.forEach(res => {
+        const opt = document.createElement('option');
+        opt.value = `${res.id} | ${res.name}`;
+        datalist.appendChild(opt);
+    });
+}
+
 async function searchGoTerm(forTemporal = false){
     const inputId = forTemporal ? 'goTermInputTemporal' : 'goTermInput';
     const statusId = forTemporal ? 'goSearchStatusTemporal' : 'goSearchStatus';
@@ -466,28 +496,16 @@ async function searchGoTerm(forTemporal = false){
     }
 
     statusEl.textContent = "Searching GO terms...";
-    const query = encodeURIComponent(input);
-    const url = `https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query=${query}&limit=20`;
 
     try {
-        const resp = await fetch(url);
-        if(!resp.ok){
-            throw new Error(`HTTP ${resp.status}`);
-        }
-        const data = await resp.json();
-        const datalist = document.getElementById('goTerms');
-        datalist.innerHTML = '';
+        const data = await fetchGoTermSuggestions(input, 20);
 
         if(!data.results || data.results.length === 0){
             statusEl.textContent = "No GO terms found for that query.";
             return null;
         }
 
-        data.results.forEach(res => {
-            const opt = document.createElement('option');
-            opt.value = `${res.id} | ${res.name}`;
-            datalist.appendChild(opt);
-        });
+        populateGoTermsDatalist(data.results);
 
         statusEl.textContent = `Found ${data.numberOfHits} terms (showing ${data.results.length}). Select one from the dropdown.`;
         document.getElementById(inputId).value = `${data.results[0].id} | ${data.results[0].name}`;
@@ -766,7 +784,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         title: `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: 40, t: 95, b: 70},
+        margin: {l: 230, r: 40, t: 95, b: 185},
         annotations: []
     };
 
@@ -778,18 +796,22 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const layoutXKey = axisIndex === 1 ? "xaxis" : `xaxis${axisIndex}`;
         const layoutYKey = axisIndex === 1 ? "yaxis" : `yaxis${axisIndex}`;
         const domain = subDomains[i];
+        const domainCenter = (domain[0] + domain[1]) / 2;
+        const domainWidth = Math.max(0.05, domain[1] - domain[0]);
+        const colorbarLen = Math.max(0.06, domainWidth * 0.88);
         const isExpression = slot.kind === "expr";
         const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
         layout[layoutXKey] = {
             title: isExpression
                 ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
-                : slot.metric,
+                : '',
             type: 'category',
             tickangle: isExpression ? 0 : -45,
             tickmode: isExpression ? 'array' : undefined,
             tickvals: isExpression ? xDisplayLabels : undefined,
             ticktext: isExpression ? xDisplayLabels : undefined,
+            showticklabels: isExpression,
             domain,
             anchor: yKey
         };
@@ -800,7 +822,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickmode: 'array',
             tickvals: geneLabels,
             ticktext: geneLabels,
-            showticklabels: true,
+            showticklabels: i === 0,
             tickfont: {size: yTickFontSize},
             domain: [0, 1],
             anchor: xKey,
@@ -818,7 +840,16 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 yaxis: yKey,
                 zmin: -2,
                 zmax: 2,
-                colorbar: {title: i === subplots.length - 1 ? 'Z-score' : ''}
+                colorbar: {
+                    title: {text: 'Z-score', side: 'bottom'},
+                    orientation: 'h',
+                    x: domainCenter,
+                    xanchor: 'center',
+                    y: -0.34,
+                    yanchor: 'top',
+                    len: colorbarLen,
+                    thickness: 10
+                }
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
@@ -836,14 +867,24 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 text: metricValues.map(v => [formatMetricCell(v)]),
                 texttemplate: "%{text}",
                 textfont: {size: 9, color: "#111"},
-                hovertemplate: "%{y}<br>" + slot.metric + ": %{z}<extra></extra>"
+                hovertemplate: "%{y}<br>" + slot.metric + ": %{z}<extra></extra>",
+                colorbar: {
+                    title: {text: slot.metric, side: 'bottom'},
+                    orientation: 'h',
+                    x: domainCenter,
+                    xanchor: 'center',
+                    y: -0.34,
+                    yanchor: 'top',
+                    len: colorbarLen,
+                    thickness: 10
+                }
             });
         }
 
         layout.annotations.push({
-            text: slot.title,
-            x: (domain[0] + domain[1]) / 2,
-            y: 1.07,
+            text: `<b>${slot.title}</b>`,
+            x: domainCenter,
+            y: 1.02,
             xref: 'paper',
             yref: 'paper',
             showarrow: false,
@@ -862,3 +903,5 @@ window.plotSpatial = plotSpatial;
 window.plotSpatialHeatmap = plotSpatialHeatmap;
 window.plotTemporal = plotTemporal;
 window.plotTemporalHeatmap = plotTemporalHeatmap;
+window.fetchGoTermSuggestions = fetchGoTermSuggestions;
+window.populateGoTermsDatalist = populateGoTermsDatalist;
