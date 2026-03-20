@@ -188,6 +188,7 @@ function plotTemporal(){
     const rnaTraces = [];
     const protTraces = [];
     const times = [30, 60, 90, 120];
+    const timeLabels = times.map(String);
 
     // RNA traces (box + points)
     if(rnaGene.length > 0){
@@ -195,7 +196,7 @@ function plotTemporal(){
             const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
             if(yVals.length > 0){
                 rnaTraces.push({
-                    x: Array(yVals.length).fill(time),
+                    x: Array(yVals.length).fill(String(time)),
                     y: yVals,
                     type: "box",
                     name: "RNA",
@@ -209,7 +210,7 @@ function plotTemporal(){
         });
         // Stripplot points
         rnaTraces.push({
-            x: rnaGene.map(d => d.time),
+            x: rnaGene.map(d => String(d.time)),
             y: rnaGene.map(d => d.value),
             mode: "markers",
             type: "scatter",
@@ -226,7 +227,7 @@ function plotTemporal(){
             const yVals = protGene.filter(d => d.time === time).map(d => d.value);
             if(yVals.length > 0){
                 protTraces.push({
-                    x: Array(yVals.length).fill(time),
+                    x: Array(yVals.length).fill(String(time)),
                     y: yVals,
                     type: "box",
                     name: "Protein",
@@ -239,7 +240,7 @@ function plotTemporal(){
             }
         });
         protTraces.push({
-            x: protGene.map(d => d.time),
+            x: protGene.map(d => String(d.time)),
             y: protGene.map(d => d.value),
             mode: "markers",
             type: "scatter",
@@ -263,18 +264,18 @@ function plotTemporal(){
 
     if(rnaTraces.length > 0 && protTraces.length > 0){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
-        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
         layout.yaxis = {title: 'Normalized Count', automargin: true};
-        layout.xaxis2 = {title: 'Time (minutes)', type: 'category'};
+        layout.xaxis2 = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
         layout.yaxis2 = {title: 'LFQ', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
         protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
     } else if(rnaTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
         layout.yaxis = {title: 'Normalized Count', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     } else if(protTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'category'};
+        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
         layout.yaxis = {title: 'LFQ', automargin: true};
         protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     }
@@ -681,6 +682,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     const protHasData = entries.some(e => e.protGene.length > 0);
 
     let xLabels = times;
+    let xDisplayLabels = times.map(String);
     if(aggregationMode === "samples"){
         const sampleSet = new Set();
         entries.forEach(e => {
@@ -693,6 +695,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             if(Number(pa[1]) !== Number(pb[1])) return Number(pa[1]) - Number(pb[1]);
             return Number(pa[2]) - Number(pb[2]);
         });
+        xDisplayLabels = [...xLabels];
     }
 
     const buildExprMatrix = (datasetKey) => entries.map(e => {
@@ -722,6 +725,13 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         return Number.isNaN(val) ? NaN : val;
     });
 
+    const formatMetricCell = (value) => {
+        if(Number.isNaN(value)) return "";
+        const abs = Math.abs(value);
+        if(abs > 0 && abs < 0.001) return Number(value).toExponential(2);
+        return Number(value).toFixed(3);
+    };
+
     const subplots = [];
     if(rnaHasData){
         subplots.push({dataset: "RNA", kind: "expr", title: "RNA"});
@@ -732,14 +742,31 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         selectedMetrics.forEach(metric => subplots.push({dataset: "Protein", kind: "metric", metric, title: `Protein ${metric}`}));
     }
 
-    const heatmapHeight = Math.max(600, 180 + (geneLabels.length * 16));
+    const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
+    const columnGap = 0.012;
+    const weights = subplots.map(slot => {
+        if(slot.kind === "expr") return 2;
+        if(slot.metric === "P_VALUE" || slot.metric === "Q_VALUE") return 0.7;
+        return 1;
+    });
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const totalGap = columnGap * Math.max(0, subplots.length - 1);
+    const usableDomain = Math.max(0.2, 1 - totalGap);
+    const subDomains = [];
+    let cursor = 0;
+    for(let i = 0; i < subplots.length; i++){
+        const width = usableDomain * (weights[i] / totalWeight);
+        const end = Math.min(1, cursor + width);
+        subDomains.push([cursor, end]);
+        cursor = end + columnGap;
+    }
+
     const layout = {
         title: `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
-        width: Math.max(1000, 280 * subplots.length),
+        width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
         margin: {l: 230, r: 40, t: 95, b: 70},
-        grid: {rows: 1, columns: subplots.length, pattern: 'independent'},
         annotations: []
     };
 
@@ -748,13 +775,21 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const axisIndex = i + 1;
         const xKey = axisIndex === 1 ? "x" : `x${axisIndex}`;
         const yKey = axisIndex === 1 ? "y" : `y${axisIndex}`;
+        const domain = subDomains[i];
+        const isExpression = slot.kind === "expr";
+        const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
         layout[xKey] = {
-            title: slot.kind === "expr"
+            title: isExpression
                 ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
                 : slot.metric,
             type: 'category',
-            tickangle: slot.kind === "expr" ? 0 : -45
+            tickangle: isExpression ? 0 : -45,
+            tickmode: isExpression ? 'array' : undefined,
+            tickvals: isExpression ? xDisplayLabels : undefined,
+            ticktext: isExpression ? xDisplayLabels : undefined,
+            domain,
+            anchor: yKey
         };
         layout[yKey] = {
             title: i === 0 ? 'Genes' : '',
@@ -764,13 +799,15 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickvals: geneLabels,
             ticktext: geneLabels,
             showticklabels: i === 0,
-            tickfont: {size: yTickFontSize}
+            tickfont: {size: yTickFontSize},
+            domain: [0, 1],
+            anchor: xKey
         };
 
-        if(slot.kind === "expr"){
+        if(isExpression){
             traces.push({
                 z: slot.dataset === "RNA" ? matrixRNA : matrixProt,
-                x: xLabels,
+                x: xDisplayLabels,
                 y: geneLabels,
                 type: "heatmap",
                 colorscale: "Viridis",
@@ -790,7 +827,10 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 colorscale: metricColorScale(slot.metric),
                 xaxis: xKey,
                 yaxis: yKey,
-                text: metricValues.map(v => [Number.isNaN(v) ? "" : Number(v).toFixed(3)]),
+                zmin: isSignificanceMetric ? 0 : undefined,
+                zmax: isSignificanceMetric ? 1 : undefined,
+                zauto: isSignificanceMetric ? false : true,
+                text: metricValues.map(v => [formatMetricCell(v)]),
                 texttemplate: "%{text}",
                 textfont: {size: 9, color: "#111"},
                 hovertemplate: "%{y}<br>" + slot.metric + ": %{z}<extra></extra>"
@@ -799,7 +839,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
 
         layout.annotations.push({
             text: slot.title,
-            x: (i + 0.5) / subplots.length,
+            x: (domain[0] + domain[1]) / 2,
             y: 1.07,
             xref: 'paper',
             yref: 'paper',
