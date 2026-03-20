@@ -369,7 +369,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             x: groups,
             y: geneLabels,
             type: "heatmap",
-            colorscale: "Viridis",
+            coloraxis: 'coloraxis',
             xaxis: 'x',
             yaxis: 'y'
         });
@@ -380,7 +380,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             x: groups,
             y: geneLabels,
             type: "heatmap",
-            colorscale: "Viridis",
+            coloraxis: 'coloraxis',
             xaxis: data.length === 0 ? 'x' : 'x2',
             yaxis: data.length === 0 ? 'y' : 'y2'
         });
@@ -390,7 +390,20 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         title: "Spatial Expression Heatmap",
         height: heatmapHeight,
         width: 1000,
-        margin: {l: 220, r: 40, t: 90, b: 60},
+        margin: {l: 220, r: 40, t: 90, b: 120},
+        coloraxis: {
+            colorscale: "Viridis",
+            colorbar: {
+                title: {text: "Z-score", side: "bottom"},
+                orientation: 'h',
+                x: 0.5,
+                xanchor: 'center',
+                y: -0.14,
+                yanchor: 'top',
+                len: 0.78,
+                thickness: 10
+            }
+        },
         annotations: []
     };
 
@@ -404,7 +417,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             {
                 text: "RNA",
                 x: 0.5,
-                y: 1.03,
+                y: 1.01,
                 xref: 'x domain',
                 yref: 'y domain',
                 showarrow: false,
@@ -413,7 +426,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             {
                 text: "Protein",
                 x: 0.5,
-                y: 1.03,
+                y: 1.01,
                 xref: 'x2 domain',
                 yref: 'y2 domain',
                 showarrow: false,
@@ -427,7 +440,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             {
                 text: data[0] ? "RNA" : "Protein",
                 x: 0.5,
-                y: 1.03,
+                y: 1.01,
                 xref: 'x domain',
                 yref: 'y domain',
                 showarrow: false,
@@ -938,7 +951,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         layout.annotations.push({
             text: `<b>${slot.title}</b>`,
             x: 0.5,
-            y: 1.03,
+            y: 1.01,
             xref: `${xKey} domain`,
             yref: `${yKey} domain`,
             showarrow: false,
