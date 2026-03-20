@@ -775,11 +775,13 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const axisIndex = i + 1;
         const xKey = axisIndex === 1 ? "x" : `x${axisIndex}`;
         const yKey = axisIndex === 1 ? "y" : `y${axisIndex}`;
+        const layoutXKey = axisIndex === 1 ? "xaxis" : `xaxis${axisIndex}`;
+        const layoutYKey = axisIndex === 1 ? "yaxis" : `yaxis${axisIndex}`;
         const domain = subDomains[i];
         const isExpression = slot.kind === "expr";
         const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
-        layout[xKey] = {
+        layout[layoutXKey] = {
             title: isExpression
                 ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
                 : slot.metric,
@@ -791,17 +793,18 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             domain,
             anchor: yKey
         };
-        layout[yKey] = {
+        layout[layoutYKey] = {
             title: i === 0 ? 'Genes' : '',
             type: 'category',
             automargin: true,
             tickmode: 'array',
             tickvals: geneLabels,
             ticktext: geneLabels,
-            showticklabels: i === 0,
+            showticklabels: true,
             tickfont: {size: yTickFontSize},
             domain: [0, 1],
-            anchor: xKey
+            anchor: xKey,
+            ticklabeloverflow: 'allow'
         };
 
         if(isExpression){
