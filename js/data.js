@@ -1,5 +1,5 @@
 const BASE =
-"https://raw.githubusercontent.com/MeijerW/ProteomeUI/main/Datafiles/"
+"https://raw.githubusercontent.com/MeijerW/Meijer-proteomics-data/main/Datafiles/"
 
 let RNA_DATA = []
 let PROT_DATA = []
