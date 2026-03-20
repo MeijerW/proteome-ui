@@ -394,13 +394,13 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         coloraxis: {
             colorscale: "Viridis",
             colorbar: {
-                title: {text: "Z-score", side: "bottom"},
-                orientation: 'h',
-                x: 0.5,
-                xanchor: 'center',
-                y: -0.14,
-                yanchor: 'top',
-                len: 0.78,
+                title: {text: "Z-score", side: "right", font: {size: 11}},
+                orientation: 'v',
+                x: 1.02,
+                xanchor: 'left',
+                y: 0.5,
+                yanchor: 'middle',
+                len: 0.65,
                 thickness: 10
             }
         },
@@ -867,13 +867,16 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickmode: 'array',
             tickvals: geneLabels,
             ticktext: geneLabels,
+            categoryorder: 'array',
+            categoryarray: geneLabels,
             showticklabels: i === 0,
             tickfont: {size: yTickFontSize},
             ticks: '',
             ticklen: 0,
             domain: [0, 1],
             anchor: xKey,
-            ticklabeloverflow: 'allow'
+            ticklabeloverflow: 'allow',
+            matches: axisIndex === 1 ? undefined : 'y'
         };
 
         if(isExpression){
@@ -888,14 +891,14 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 zmin: -2,
                 zmax: 2,
                 colorbar: {
-                    title: {text: 'Z-score', side: 'bottom'},
-                    orientation: 'h',
-                    x: domainCenter,
-                    xanchor: 'center',
-                    y: -0.14,
-                    yanchor: 'top',
-                    len: colorbarLen,
-                    thickness: 10
+                    title: {text: 'Z-score', side: 'right', font: {size: 10}},
+                    orientation: 'v',
+                    x: 1.015,
+                    xanchor: 'left',
+                    y: 0.5,
+                    yanchor: 'middle',
+                    len: 0.5,
+                    thickness: 8
                 }
             });
         } else {
@@ -922,14 +925,14 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
                 colorbar: {
-                    title: {text: scaleConfig.colorbarTitle, side: 'bottom'},
-                    orientation: 'h',
-                    x: domainCenter,
-                    xanchor: 'center',
-                    y: -0.14,
-                    yanchor: 'top',
-                    len: colorbarLen,
-                    thickness: 10
+                    title: {text: scaleConfig.colorbarTitle, side: 'right', font: {size: 10}},
+                    orientation: 'v',
+                    x: 1.015,
+                    xanchor: 'left',
+                    y: 0.5,
+                    yanchor: 'middle',
+                    len: 0.5,
+                    thickness: 8
                 }
             });
 
