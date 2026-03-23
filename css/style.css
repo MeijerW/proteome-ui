@@ -508,7 +508,7 @@ footer {
 
 .home-no-coding h3,
 .home-source h3 {
-    font-size: 0.9rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #006c70;
     text-transform: uppercase;
@@ -558,7 +558,7 @@ footer {
 }
 
 .home-how-title {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     font-weight: 700;
     color: #ffffff;
     margin: 0;
@@ -615,15 +615,35 @@ footer {
 .home-tabs-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 40px;
-    text-align: center;
+    gap: 28px;
+    text-align: left;
+}
+
+.home-tab-card {
+    background: #f9fbfb;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.home-tab-card::before {
+    content: '';
+    display: block;
+    height: 6px;
+    background: #006c70;
+    border-radius: 8px 8px 0 0;
+}
+
+.home-tab-card-body {
+    padding: 24px 26px 28px;
 }
 
 .home-tab-card h4 {
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: #006c70;
-    font-weight: 400;
-    margin: 0 0 14px;
+    font-weight: 700;
+    margin: 0 0 12px;
 }
 
 .home-tab-card p {
