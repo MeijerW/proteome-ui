@@ -14,81 +14,96 @@
 
 <body>
 
-<header class="header">
-<h1>ProteomeUI</h1>
-<p>Somitogenesis Expression Explorer</p>
-</header>
+<!-- Hero Section: full-width teal background -->
+<section class="home-hero">
+  <p class="home-brand">ProteomeUI</p>
+<div class="home-hero-inner">
 
-<!-- Hero Section: 2x2 Grid -->
-<section class="hero-grid">
+  <!-- Left: Title, Subtitle, Launch Button -->
+  <div class="home-hero-left">
+    <h1 class="home-hero-title">Explore RNA and<br>protein expression</h1>
+    <h2 class="home-hero-sub">in mouse somitogenesis</h2>
+    <a class="home-launch-btn" href="explorer.html">Launch Explorer</a>
+  </div>
 
-<!-- Top-Left: Title, Info, Launch Button -->
-<div class="hero-left">
-<div class="hero-title">
-<h2 class="title-main">Explore</h2>
-<h2 class="title-sub">RNA and protein expression</h2>
-<h2 class="title-main">during mouse somitogenesis</h2>
+  <!-- Right: Infographic Placeholder -->
+  <div class="home-hero-right">
+    <div class="infographic-placeholder">
+      <p style="font-size: 1rem; color: #aacfcf;">Infographic &amp; Tool Preview</p>
+      <p style="font-size: 0.85rem; color: #7db5b5;">Your visualization will appear here</p>
+    </div>
+  </div>
+
 </div>
-
-<p class="hero-desc">
-Interactively visualize spatial and spatiotemporal gene expression patterns without coding. Our integrated platform combines RNA sequencing and proteomics data for comprehensive somitogenesis analysis.
-</p>
-
-<a class="launch-btn" href="explorer.html">
-Launch Explorer
-</a>
-</div>
-
-<!-- Top-Right: Infographic Placeholder & Tool Preview -->
-<div class="hero-right">
-<div class="infographic-placeholder">
-<p style="font-size: 1rem; color: #999;">Infographic & Tool Preview</p>
-<p style="font-size: 0.85rem; color: #bbb;">Your visualization will appear here</p>
-</div>
-</div>
-
 </section>
 
-<!-- Bottom Row: 2 Columns -->
-<section class="features-publication">
+<!-- Info Section: light gray, 2 columns -->
+<section class="home-info">
+<div class="home-info-inner">
 
-<!-- Bottom-Left: What You Can Do -->
-<div class="features-panel">
-<h3>What You Can Do</h3>
-<ul>
-<li><strong>No Coding Required</strong> — Intuitive interface for researchers of all backgrounds</li>
-<li><strong>Explore Spatial Patterns</strong> — Compare RNA and protein expression across regions</li>
-<li><strong>Analyze Temporal Dynamics</strong> — Track gene expression changes through developmental timepoints</li>
-<li><strong>Search by Gene or GO Term</strong> — Quick lookup of your genes of interest</li>
-<li><strong>Publication-Ready Exports</strong> — Download high-quality figures for your papers</li>
-</ul>
+  <!-- Left: No Coding Needed -->
+  <div class="home-no-coding">
+    <h3>No Coding Needed</h3>
+    <p class="home-panel-lead"><strong>Interactively visualize spatial and spatiotemporal gene expression patterns.</strong></p>
+    <p>We have combined RNA sequencing and proteomics data for a comprehensive study of gene and protein expression in somitogenesis.</p>
+  </div>
+
+  <!-- Right: Source of This Data -->
+  <div class="home-source">
+    <h3>Source of This Data</h3>
+    <p>Interested in the methods? Check out our paper:</p>
+    <p><strong>Spatiotemporal proteomics reveals dynamic antagonistic gradients shaping signalling waves</strong></p>
+    <p>Wilke H. M. Meijer, Virginia Andrade, Suzan Stelloo, Wouter M. Thomas, Marek J. van Oostrom, Eveline F. Ilcken, Kim T. J. Peters, Michiel Vermeulen, Katharina F. Sonnen</p>
+    <p><em>bioRxiv</em> 2025.09.05.674076<br>
+    <a href="https://doi.org/10.1101/2025.09.05.674076" target="_blank">doi: 10.1101/2025.09.05.674076</a></p>
+  </div>
+
 </div>
-
-<!-- Bottom-Right: About Section with Publication -->
-<div class="about-panel">
-<h3>About This Data</h3>
-<p>
-<strong>Spatiotemporal proteomics reveals dynamic antagonistic gradients shaping signalling waves</strong>
-</p>
-<p>
-Wilke H. M. Meijer, Virginia Andrade, Suzan Stelloo, Wouter M. Thomas, Marek J. van Oostrom, Eveline F. Ilcken, Kim T. J. Peters, Michiel Vermeulen, Katharina F. Sonnen
-</p>
-<p>
-<em>bioRxiv</em> 2025.09.05.674076<br>
-<a href="https://doi.org/10.1101/2025.09.05.674076" target="_blank">doi: 10.1101/2025.09.05.674076</a>
-</p>
-<p style="margin-top: 1rem; font-size: 0.9rem;">
-Built by Wilke Meijer, PhD (Sonnen lab, Hubrecht Institute). <a href="https://github.com/MeijerW/proteome-ui" target="_blank">Open-source on GitHub</a>.
-</p>
-<p style="font-size: 0.85rem; color: #666;">
-March 2026
-</p>
-</div>
-
 </section>
 
-<footer>
-Made by Wilke Meijer, PhD, Sonnen lab
+<!-- How It Works: teal background -->
+<section class="home-how">
+<div class="home-how-inner">
+  <h3 class="home-how-title">How it works</h3>
+  <ol class="home-how-steps">
+    <li>Select the tab you want to use</li>
+    <li>Input your gene(s) of choice</li>
+    <li><strong>Generate a plot!</strong></li>
+  </ol>
+</div>
+</section>
+
+<!-- The Tabs: white background -->
+<section class="home-tabs">
+<div class="home-tabs-inner">
+  <h2 class="home-tabs-heading">T H E &nbsp; T A B S</h2>
+  <hr class="home-tabs-divider">
+  <div class="home-tabs-grid">
+
+    <div class="home-tab-card">
+      <h4>Spatial viewer</h4>
+      <p>Compare RNA and protein expression for one or more genes across posterior PSM, anterior PSM and somite regions.</p>
+    </div>
+
+    <div class="home-tab-card">
+      <h4>Spatiotemporal viewer</h4>
+      <p>Check gene expression during the different oscillation phases of somitogenesis for each region.</p>
+    </div>
+
+    <div class="home-tab-card">
+      <h4>GO term browser</h4>
+      <p>Interested in general processes? Select your GO term and get an overview of the gene expression, for either spatial or spatiotemporal data.</p>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- Footer: teal background -->
+<footer class="home-footer">
+  <span>Made by Wilke Meijer, PhD</span>
+  <span>March 2026</span>
+  <span><a href="https://www.hubrecht.eu/research-groups/sonnen-group/" target="_blank">Go back to the Sonnen lab website</a></span>
 </footer>
 
 </body>

@@ -395,3 +395,302 @@ footer {
     padding: 2rem;
     font-size: 0.9rem;
 }
+
+/* ===== HOME PAGE (index.html) ===== */
+
+.home-hero {
+    background: #006c70;
+    width: 100%;
+    position: relative;
+}
+
+.home-brand {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.8);
+    margin: 0;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    z-index: 1;
+}
+
+.home-hero-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 50px 40px 60px;
+    gap: 60px;
+    align-items: center;
+}
+
+.home-brand {
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.75);
+    margin: 0 0 20px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.home-hero-left {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.home-hero-title {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.15;
+}
+
+.home-hero-sub {
+    font-size: 1.4rem;
+    font-weight: 400;
+    font-style: italic;
+    color: rgba(255,255,255,0.85);
+    margin: 0;
+}
+
+.home-launch-btn {
+    display: inline-block;
+    padding: 13px 44px;
+    border: 1.5px solid rgba(255,255,255,0.8);
+    color: #ffffff;
+    background: transparent;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.03em;
+    border-radius: 2px;
+    align-self: flex-start;
+    transition: background 0.2s, color 0.2s;
+}
+
+.home-launch-btn:hover {
+    background: #ffffff;
+    color: #006c70;
+}
+
+.home-hero-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.home-hero-right .infographic-placeholder {
+    background: rgba(255,255,255,0.08);
+    border: 2px dashed rgba(255,255,255,0.3);
+    border-radius: 12px;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+}
+
+/* Info section */
+
+.home-info {
+    background: #e5e5e5;
+    width: 100%;
+}
+
+.home-info-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    gap: 60px;
+}
+
+.home-no-coding h3,
+.home-source h3 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #006c70;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0 0 20px;
+}
+
+.home-panel-lead {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: #222;
+    font-style: italic;
+    margin: 0 0 14px;
+}
+
+.home-no-coding p,
+.home-source p {
+    font-size: 0.93rem;
+    line-height: 1.65;
+    color: #333;
+    margin: 0 0 10px;
+}
+
+.home-source a {
+    color: #006c70;
+    text-decoration: underline;
+}
+
+.home-source a:hover {
+    color: #005a5a;
+}
+
+/* How it works */
+
+.home-how {
+    background: #006c70;
+    width: 100%;
+}
+
+.home-how-inner {
+    display: flex;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 44px 40px;
+    gap: 80px;
+}
+
+.home-how-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.home-how-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-how-steps li {
+    font-size: 1rem;
+    color: rgba(255,255,255,0.88);
+}
+
+.home-how-steps li:last-child {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+/* The Tabs */
+
+.home-tabs {
+    background: #ffffff;
+    width: 100%;
+}
+
+.home-tabs-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 40px;
+}
+
+.home-tabs-heading {
+    font-size: 2rem;
+    font-weight: 300;
+    color: #006c70;
+    letter-spacing: 0.2em;
+    margin: 0 0 28px;
+}
+
+.home-tabs-divider {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 0 0 48px;
+}
+
+.home-tabs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 40px;
+    text-align: center;
+}
+
+.home-tab-card h4 {
+    font-size: 1rem;
+    color: #006c70;
+    font-weight: 400;
+    margin: 0 0 14px;
+}
+
+.home-tab-card p {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: #444;
+    margin: 0;
+}
+
+/* Home footer */
+
+.home-footer {
+    background: #006c70;
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 40px;
+    font-size: 0.88rem;
+}
+
+.home-footer a {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.home-footer a:hover {
+    color: rgba(255,255,255,0.75);
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+    .home-hero-inner,
+    .home-info-inner {
+        grid-template-columns: 1fr;
+        padding: 40px 24px;
+        gap: 36px;
+    }
+
+    .home-hero-title {
+        font-size: 2.2rem;
+    }
+
+    .home-hero-sub {
+        font-size: 1.15rem;
+    }
+
+    .home-how-inner {
+        flex-direction: column;
+        gap: 20px;
+        padding: 40px 24px;
+    }
+
+    .home-tabs-inner {
+        padding: 48px 24px;
+    }
+
+    .home-tabs-grid {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+
+    .home-footer {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+        padding: 24px;
+    }
+}
