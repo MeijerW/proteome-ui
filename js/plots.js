@@ -1,3 +1,57 @@
+const VIEW_PLOT_STATE = {};
+
+function clonePlotState(value){
+    return JSON.parse(JSON.stringify(value));
+}
+
+function hasRenderedPlot(){
+    const plotEl = document.getElementById("plot");
+    return !!(plotEl && Array.isArray(plotEl.data) && plotEl.data.length > 0);
+}
+
+function clearExplorerPlot(){
+    const plotEl = document.getElementById("plot");
+    if(plotEl && typeof Plotly !== "undefined"){
+        Plotly.purge(plotEl);
+        plotEl.innerHTML = "";
+    }
+    clearTemporalStatsPanel();
+}
+
+function savePlotStateForView(viewKey){
+    if(!viewKey || !hasRenderedPlot()) return;
+
+    const plotEl = document.getElementById("plot");
+    const statsPanel = document.getElementById("temporalStatsPanel");
+    VIEW_PLOT_STATE[viewKey] = {
+        data: clonePlotState(plotEl.data),
+        layout: clonePlotState(plotEl.layout || {}),
+        config: clonePlotState(plotEl.config || {}),
+        statsHtml: statsPanel ? statsPanel.innerHTML : "",
+        statsActive: statsPanel ? statsPanel.classList.contains("active") : false
+    };
+}
+
+function saveCurrentViewPlot(){
+    if(typeof window.getCurrentViewKey !== "function") return;
+    savePlotStateForView(window.getCurrentViewKey());
+}
+
+function restorePlotStateForView(viewKey){
+    clearExplorerPlot();
+
+    if(!viewKey || !VIEW_PLOT_STATE[viewKey]) return;
+
+    const state = VIEW_PLOT_STATE[viewKey];
+    Plotly.newPlot("plot", clonePlotState(state.data), clonePlotState(state.layout), clonePlotState(state.config));
+
+    const statsPanel = document.getElementById("temporalStatsPanel");
+    if(statsPanel){
+        statsPanel.innerHTML = state.statsHtml || "";
+        statsPanel.classList.toggle("active", !!state.statsActive);
+    }
+}
+
 function plotSpatial(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -17,8 +71,9 @@ function plotSpatial(){
     }
 
     const traces = [];
+    const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
     const layout = {
-        title: "Spatial Expression",
+        title: `Spatial Expression - ${displayGene}`,
         template: "simple_white",
         height: 600,
         width: 800
@@ -64,6 +119,7 @@ function plotSpatial(){
     }
 
     Plotly.newPlot("plot", traces, layout);
+    saveCurrentViewPlot();
 }
 
 const TEMPORAL_META_FIELDS = [
@@ -252,9 +308,10 @@ function plotTemporal(){
     }
 
     const traces = [...rnaTraces, ...protTraces];
+    const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
 
     const layout = {
-        title: `Spatiotemporal Expression - ${region}`,
+        title: `Spatiotemporal Expression - ${displayGene} (${region})`,
         template: "simple_white",
         height: 600,
         width: 800,
@@ -282,6 +339,7 @@ function plotTemporal(){
 
     Plotly.newPlot("plot", traces, layout);
     renderTemporalStatsPanel(gene, region, rnaGene, protGene);
+    saveCurrentViewPlot();
 }
 
 function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
@@ -450,6 +508,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     }
 
     Plotly.newPlot("plot", data, layout);
+    saveCurrentViewPlot();
 }
 
 // GO term helpers
@@ -963,6 +1022,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     });
 
     Plotly.newPlot("plot", traces, layout);
+    saveCurrentViewPlot();
 }
 
 // Expose key functions to the global scope (for inline onclick handlers)
@@ -975,3 +1035,6 @@ window.plotTemporal = plotTemporal;
 window.plotTemporalHeatmap = plotTemporalHeatmap;
 window.fetchGoTermSuggestions = fetchGoTermSuggestions;
 window.populateGoTermsDatalist = populateGoTermsDatalist;
+window.clearExplorerPlot = clearExplorerPlot;
+window.restorePlotStateForView = restorePlotStateForView;
+window.savePlotStateForView = savePlotStateForView;
