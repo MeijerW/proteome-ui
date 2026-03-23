@@ -444,8 +444,10 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         });
     }
 
+    const customPlotTitle = optionsOverride?.plotTitle;
+
     const layout = {
-        title: "Spatial Expression Heatmap",
+        title: customPlotTitle || "Spatial Expression Heatmap",
         height: heatmapHeight,
         width: 1000,
         margin: {l: 220, r: 40, t: 90, b: 120},
@@ -677,7 +679,8 @@ async function plotGoSpatialHeatmap(){
         document.getElementById('spatialGenes').value = matched.join(',');
         const goOptions = {
             membershipMode: getHeatmapGeneMembership("goSpatialGeneMembership"),
-            aggregationMode: getAggregationMode("goSpatialAggregation")
+            aggregationMode: getAggregationMode("goSpatialAggregation"),
+            plotTitle: `GO Term Spatial Heatmap - ${goId}`
         };
         statusEl.textContent = `Plotting ${matched.length} dataset-matched genes for GO term ${goId}...`;
         plotSpatialHeatmap(matched, goOptions);
@@ -712,7 +715,8 @@ async function plotGoTemporalHeatmap(){
         const goOptions = {
             membershipMode: getHeatmapGeneMembership("goTemporalGeneMembership"),
             aggregationMode: getAggregationMode("goTemporalAggregation"),
-            selectedMetrics: getSelectedTemporalMetrics(".go-temporal-metric-checkbox")
+            selectedMetrics: getSelectedTemporalMetrics(".go-temporal-metric-checkbox"),
+            plotTitle: `GO Term Spatiotemporal Heatmap - ${goId}`
         };
         plotTemporalHeatmap(matched, region, goOptions);
         statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
@@ -882,8 +886,10 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         cursor = end + columnGap;
     }
 
+    const customPlotTitle = optionsOverride?.plotTitle;
+
     const layout = {
-        title: `Spatiotemporal Expression Heatmap - ${region}`,
+        title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
         margin: {l: 230, r: 40, t: 95, b: 145},
