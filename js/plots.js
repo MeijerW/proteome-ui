@@ -892,8 +892,23 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: 40, t: 95, b: 145},
+        margin: {l: 230, r: 40, t: 95, b: 210},
         annotations: []
+    };
+
+    const buildDomainColorbar = (domain, titleText) => {
+        const domainCenter = (domain[0] + domain[1]) / 2;
+        const domainWidth = Math.max(0.06, domain[1] - domain[0]);
+        return {
+            title: {text: titleText, side: 'top', font: {size: 10}},
+            orientation: 'h',
+            x: domainCenter,
+            xanchor: 'center',
+            y: -0.2,
+            yanchor: 'top',
+            len: Math.max(0.06, domainWidth * 0.88),
+            thickness: 8
+        };
     };
 
     const traces = [];
@@ -904,11 +919,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const layoutXKey = axisIndex === 1 ? "xaxis" : `xaxis${axisIndex}`;
         const layoutYKey = axisIndex === 1 ? "yaxis" : `yaxis${axisIndex}`;
         const domain = subDomains[i];
-        const domainCenter = (domain[0] + domain[1]) / 2;
-        const domainWidth = Math.max(0.05, domain[1] - domain[0]);
-        const colorbarLen = domainWidth;
         const isExpression = slot.kind === "expr";
-        const isSignificanceMetric = slot.metric === "P_VALUE" || slot.metric === "Q_VALUE";
 
         layout[layoutXKey] = {
             title: isExpression
@@ -955,16 +966,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 yaxis: yKey,
                 zmin: -2,
                 zmax: 2,
-                colorbar: {
-                    title: {text: 'Z-score', side: 'right', font: {size: 10}},
-                    orientation: 'v',
-                    x: 1.015,
-                    xanchor: 'left',
-                    y: 0.5,
-                    yanchor: 'middle',
-                    len: 0.5,
-                    thickness: 8
-                }
+                colorbar: buildDomainColorbar(domain, 'Z-score')
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
@@ -989,16 +991,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 hovertemplate: slot.metric === "PERIOD"
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
-                colorbar: {
-                    title: {text: scaleConfig.colorbarTitle, side: 'right', font: {size: 10}},
-                    orientation: 'v',
-                    x: 1.015,
-                    xanchor: 'left',
-                    y: 0.5,
-                    yanchor: 'middle',
-                    len: 0.5,
-                    thickness: 8
-                }
+                colorbar: buildDomainColorbar(domain, scaleConfig.colorbarTitle)
             });
 
             // Keep numeric values visible regardless of heatmap text rendering support
