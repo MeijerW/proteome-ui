@@ -425,12 +425,6 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     const toZScore = (row) => Number(row["Z-score"]);
     const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
-    const sortSamples = (a, b) => {
-        const pa = String(a).match(/(\d+)(?!.*\d)/);
-        const pb = String(b).match(/(\d+)(?!.*\d)/);
-        if(pa && pb && Number(pa[1]) !== Number(pb[1])) return Number(pa[1]) - Number(pb[1]);
-        return String(a).localeCompare(String(b));
-    };
 
     const entries = [];
     genes.forEach(gene => {
@@ -457,25 +451,24 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     entries.sort((a, b) => b.posteriorSort - a.posteriorSort);
 
-    const sampleGroups = groups.map(group => {
-        const sampleSet = new Set();
+    // Spatial CSV rows do not carry explicit sample IDs. In sample mode we therefore
+    // expose the original per-group values by replicate slot (REP_1..REP_n).
+    const replicateCountByGroup = groups.reduce((acc, group) => {
+        let maxCount = 0;
         entries.forEach(e => {
-            e.rnaGene.forEach(row => {
-                if(row.group === group && row.sample) sampleSet.add(String(row.sample));
-            });
-            e.protGene.forEach(row => {
-                if(row.group === group && row.sample) sampleSet.add(String(row.sample));
-            });
+            const rnaCount = e.rnaGene.filter(row => row.group === group).length;
+            const protCount = e.protGene.filter(row => row.group === group).length;
+            maxCount = Math.max(maxCount, rnaCount, protCount);
         });
-        const samples = Array.from(sampleSet).sort(sortSamples);
-        return { group, samples };
-    });
+        acc[group] = Math.max(1, maxCount);
+        return acc;
+    }, {});
 
     const xLabels = aggregationMode === "samples"
-        ? sampleGroups.flatMap(({group, samples}) => {
-            if(samples.length === 0) return [group];
-            return samples.map(sample => `${group} | ${sample}`);
-        })
+        ? groups.flatMap(group => Array.from(
+            {length: replicateCountByGroup[group]},
+            (_, idx) => `${group} | REP_${idx + 1}`
+        ))
         : [...groups];
 
     const getMeanByGroup = (rows, group) => {
@@ -483,12 +476,12 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         return mean(vals);
     };
 
-    const getMeanByGroupAndSample = (rows, group, sample) => {
+    const getReplicateValue = (rows, group, repIndex) => {
         const vals = rows
-            .filter(d => d.group === group && String(d.sample || "") === sample)
+            .filter(d => d.group === group)
             .map(toZScore)
             .filter(v => !Number.isNaN(v));
-        return mean(vals);
+        return repIndex < vals.length ? vals[repIndex] : NaN;
     };
 
     const buildRow = (rows) => {
@@ -499,8 +492,10 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             const parts = String(label).split(' | ');
             if(parts.length < 2) return getMeanByGroup(rows, parts[0]);
             const group = parts[0];
-            const sample = parts.slice(1).join(' | ');
-            return getMeanByGroupAndSample(rows, group, sample);
+            const repLabel = parts.slice(1).join(' | ');
+            const repMatch = repLabel.match(/REP_(\d+)$/);
+            const repIndex = repMatch ? (Number(repMatch[1]) - 1) : 0;
+            return getReplicateValue(rows, group, repIndex);
         });
     };
 
@@ -858,16 +853,22 @@ async function plotGoTemporalHeatmap(){
     const statusEl = document.getElementById('goSearchStatusTemporal');
     statusEl.textContent = 'Loading gene list for ' + goId + '...';
     setGoButtonLoading('goTemporalGenerateBtn', true, 'Generate GO heatmap (Spatiotemporal)');
+    console.groupCollapsed(`[GO Temporal] ${goId}`);
+    console.info('[GO Temporal] Fetching GO annotations...');
 
     try {
         const genes = await fetchGoTermGenes(goId, (progress) => {
             updateGoProgress('goSearchStatusTemporal', 'goTemporalProgressWrap', 'goTemporalProgressBar', progress);
         });
+        console.info('[GO Temporal] GO symbols fetched:', { goId, symbolsFetched: genes.length });
         const { matched, missing } = inspectGoGenesForDataset(goId, genes);
+        console.info('[GO Temporal] Dataset match summary:', { matched: matched.length, missing });
         const geneCountEl = document.getElementById('goGeneCountTemporal');
         geneCountEl.textContent = `Found ${genes.length} GO symbols; ${matched.length} are present in this dataset (${missing} absent).`;
         if(matched.length === 0){
             statusEl.textContent = `Loaded GO genes for ${goId}, but none are present in the current dataset.`;
+            console.warn('[GO Temporal] No matched genes in dataset.');
+            console.groupEnd();
             return;
         }
         document.getElementById('temporalGenes').value = matched.join(',');
@@ -882,10 +883,13 @@ async function plotGoTemporalHeatmap(){
         };
         plotTemporalHeatmap(matched, region, goOptions);
         statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
+        console.info('[GO Temporal] Passed matched genes to plotTemporalHeatmap.', { region, metrics: goOptions.selectedMetrics });
     } catch (err){
         statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
+        console.error('[GO Temporal] Failed:', err);
     } finally {
         setGoButtonLoading('goTemporalGenerateBtn', false, 'Generate GO heatmap (Spatiotemporal)');
+        console.groupEnd();
     }
 }
 
@@ -904,13 +908,24 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     }
 
     const region = regionOverride || document.getElementById("heatmapRegion").value;
-    const genes = genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g);
+    const genes = Array.from(new Set(genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g)));
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("temporalAggregation");
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("temporalGeneMembership");
     const selectedMetrics = optionsOverride?.selectedMetrics || getSelectedTemporalMetrics();
     const pValueFilterMode = optionsOverride?.pValueFilterMode || (document.getElementById("temporalPValueFilter")?.value || "all");
     const applyPValueFilter = selectedMetrics.includes("P_VALUE") && pValueFilterMode === "significant";
     const times = [30, 60, 90, 120];
+
+    console.groupCollapsed(`[TemporalHeatmap] Start | region=${region}`);
+    console.info('[TemporalHeatmap] Input genes:', {
+        rawGeneTextLength: genesText.length,
+        parsedGenes: genes.length,
+        aggregationMode,
+        membershipMode,
+        selectedMetrics,
+        pValueFilterMode,
+        applyPValueFilter
+    });
 
     const hasSignificantPValue = (rows) => {
         if(!rows || rows.length === 0) return false;
@@ -939,16 +954,27 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         });
     });
 
+    console.info('[TemporalHeatmap] Dataset match summary:', {
+        requestedGenes: genes.length,
+        matchedGenes: entries.length,
+        rnaRows: entries.reduce((sum, e) => sum + e.rnaGene.length, 0),
+        protRows: entries.reduce((sum, e) => sum + e.protGene.length, 0)
+    });
+
     entries.sort((a, b) => a.lagSort - b.lagSort);
 
     if(entries.length === 0){
         if(applyPValueFilter){
             alert("No genes passed the P_VALUE < 0.05 filter in selected region");
+            console.warn('[TemporalHeatmap] No genes left after P_VALUE filter.');
+            console.groupEnd();
             return;
         }
         alert(membershipMode === "both"
             ? "No genes found in both RNA and Protein for current selection"
             : "No valid genes found in selected region");
+        console.warn('[TemporalHeatmap] No valid genes after membership/data checks.');
+        console.groupEnd();
         return;
     }
 
@@ -972,6 +998,12 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         });
         xDisplayLabels = [...xLabels];
     }
+
+    console.info('[TemporalHeatmap] X-axis setup:', {
+        aggregationMode,
+        xLabelCount: xLabels.length,
+        firstLabels: xDisplayLabels.slice(0, 8)
+    });
 
     const buildExprMatrix = (datasetKey) => entries.map(e => {
         const rows = datasetKey === "RNA" ? e.rnaGene : e.protGene;
@@ -1045,6 +1077,13 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         selectedMetrics.forEach(metric => subplots.push({dataset: "Protein", kind: "metric", metric, title: `Protein ${metric}`}));
     }
 
+    console.info('[TemporalHeatmap] Subplots:', {
+        subplotCount: subplots.length,
+        rnaHasData,
+        protHasData,
+        subplotTitles: subplots.map(s => s.title)
+    });
+
     const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
     const baseColumnGap = 0.012;
@@ -1062,19 +1101,42 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         effectiveColumnGap = 0.98 / gapSlots;
     }
     const totalGap = effectiveColumnGap * gapSlots;
-    const usableDomain = Math.max(0.02, 1 - totalGap);
+    const usableDomain = Math.max(0.05, 1 - totalGap);
+    const minWidth = 0.01;
     const subDomains = [];
-    let cumulativeWeight = 0;
+    let cursor = 0;
     for(let i = 0; i < subplots.length; i++){
-        const gapOffset = i * effectiveColumnGap;
-        const start = (cumulativeWeight / totalWeight) * usableDomain + gapOffset;
-        cumulativeWeight += weights[i];
-        const rawEnd = (cumulativeWeight / totalWeight) * usableDomain + gapOffset;
-        // Clamp to [0,1] and guard against floating-point rounding making start >= end
-        const s = Math.max(0, Math.min(start, 0.998));
-        const e = Math.min(1, Math.max(rawEnd, s + 0.002));
-        subDomains.push([s, e]);
+        const width = usableDomain * (weights[i] / totalWeight);
+        const rawStart = cursor;
+        const rawEnd = i === (subplots.length - 1) ? 1 : (rawStart + width);
+        let s = Math.max(0, Math.min(1, rawStart));
+        let e = Math.max(0, Math.min(1, rawEnd));
+        if(e - s < minWidth){
+            e = Math.min(1, s + minWidth);
+            if(e - s < minWidth){
+                s = Math.max(0, e - minWidth);
+            }
+        }
+        subDomains.push([Number(s.toFixed(6)), Number(e.toFixed(6))]);
+        cursor = e + effectiveColumnGap;
     }
+
+    // Final guard: ensure strictly increasing domains so Plotly axis scaling cannot fail.
+    for(let i = 1; i < subDomains.length; i++){
+        if(subDomains[i][0] <= subDomains[i - 1][0]){
+            subDomains[i][0] = Number(Math.min(0.999, subDomains[i - 1][0] + minWidth).toFixed(6));
+        }
+        if(subDomains[i][1] <= subDomains[i][0]){
+            subDomains[i][1] = Number(Math.min(1, subDomains[i][0] + minWidth).toFixed(6));
+        }
+    }
+
+    console.info('[TemporalHeatmap] Axis domain summary:', {
+        gapSlots,
+        effectiveColumnGap,
+        usableDomain,
+        subDomains
+    });
 
     const customPlotTitle = optionsOverride?.plotTitle;
 
@@ -1218,10 +1280,24 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     try {
         Plotly.newPlot("plot", traces, layout);
     } catch (err) {
-        console.error("Temporal heatmap rendering failed", err);
+        console.error("Temporal heatmap rendering failed", err, {
+            region,
+            genesRequested: genes.length,
+            genesMatched: entries.length,
+            aggregationMode,
+            membershipMode,
+            selectedMetrics,
+            xLabelCount: xDisplayLabels.length,
+            subplotCount: subplots.length,
+            domains: subDomains,
+            traceCount: traces.length
+        });
+        console.groupEnd();
         alert(`Failed to render spatiotemporal heatmap: ${err.message}`);
         return;
     }
+    console.info('[TemporalHeatmap] Plot rendered successfully.', { traceCount: traces.length, genes: entries.length });
+    console.groupEnd();
     saveCurrentViewPlot();
 }
 
