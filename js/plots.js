@@ -423,6 +423,15 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("spatialGeneMembership");
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("spatialAggregation");
 
+    const toZScore = (row) => Number(row["Z-score"]);
+    const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
+    const sortSamples = (a, b) => {
+        const pa = String(a).match(/(\d+)(?!.*\d)/);
+        const pb = String(b).match(/(\d+)(?!.*\d)/);
+        if(pa && pb && Number(pa[1]) !== Number(pb[1])) return Number(pa[1]) - Number(pb[1]);
+        return String(a).localeCompare(String(b));
+    };
+
     const entries = [];
     genes.forEach(gene => {
         const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
@@ -433,33 +442,71 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         if(!hasRna && !hasProt) return;
         if(membershipMode === "both" && !(hasRna && hasProt)) return;
 
-        const getGroupValue = (arr, group) => {
-            const vals = arr.filter(d => d.group === group).map(d => d["Z-score"]).filter(v => !Number.isNaN(v));
-            if(vals.length === 0) return NaN;
-            if(aggregationMode === "samples") return vals[0];
-            return vals.reduce((a, b) => a + b, 0) / vals.length;
-        };
-
-        const rowRNA = groups.map(group => getGroupValue(rnaGene, group));
-        const rowProt = groups.map(group => getGroupValue(protGene, group));
-        const posteriorValues = [rowRNA[0], rowProt[0]].filter(v => !Number.isNaN(v));
-        const posteriorSort = posteriorValues.length > 0
-            ? posteriorValues.reduce((a, b) => a + b, 0) / posteriorValues.length
-            : Number.NEGATIVE_INFINITY;
+        const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
+        const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
+        const posteriorValues = [posteriorRNA, posteriorProt].filter(v => !Number.isNaN(v));
+        const posteriorSort = posteriorValues.length > 0 ? mean(posteriorValues) : Number.NEGATIVE_INFINITY;
 
         entries.push({
             label: rnaGene[0]?.ID || protGene[0]?.ID,
-            rowRNA,
-            rowProt,
+            rnaGene,
+            protGene,
             posteriorSort
         });
     });
 
     entries.sort((a, b) => b.posteriorSort - a.posteriorSort);
 
+    const sampleGroups = groups.map(group => {
+        const sampleSet = new Set();
+        entries.forEach(e => {
+            e.rnaGene.forEach(row => {
+                if(row.group === group && row.sample) sampleSet.add(String(row.sample));
+            });
+            e.protGene.forEach(row => {
+                if(row.group === group && row.sample) sampleSet.add(String(row.sample));
+            });
+        });
+        const samples = Array.from(sampleSet).sort(sortSamples);
+        return { group, samples };
+    });
+
+    const xLabels = aggregationMode === "samples"
+        ? sampleGroups.flatMap(({group, samples}) => {
+            if(samples.length === 0) return [group];
+            return samples.map(sample => `${group} | ${sample}`);
+        })
+        : [...groups];
+
+    const getMeanByGroup = (rows, group) => {
+        const vals = rows.filter(d => d.group === group).map(toZScore).filter(v => !Number.isNaN(v));
+        return mean(vals);
+    };
+
+    const getMeanByGroupAndSample = (rows, group, sample) => {
+        const vals = rows
+            .filter(d => d.group === group && String(d.sample || "") === sample)
+            .map(toZScore)
+            .filter(v => !Number.isNaN(v));
+        return mean(vals);
+    };
+
+    const buildRow = (rows) => {
+        if(aggregationMode !== "samples"){
+            return groups.map(group => getMeanByGroup(rows, group));
+        }
+        return xLabels.map(label => {
+            const parts = String(label).split(' | ');
+            if(parts.length < 2) return getMeanByGroup(rows, parts[0]);
+            const group = parts[0];
+            const sample = parts.slice(1).join(' | ');
+            return getMeanByGroupAndSample(rows, group, sample);
+        });
+    };
+
     const geneLabels = entries.map(e => e.label);
-    const matrixRNA = entries.map(e => e.rowRNA);
-    const matrixProt = entries.map(e => e.rowProt);
+    const matrixRNA = entries.map(e => buildRow(e.rnaGene));
+    const matrixProt = entries.map(e => buildRow(e.protGene));
 
     if(matrixRNA.length === 0 && matrixProt.length === 0){
         alert(membershipMode === "both"
@@ -486,7 +533,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     if(matrixRNA.some(row => row.some(v => !isNaN(v)))){
         data.push({
             z: matrixRNA,
-            x: groups,
+            x: xLabels,
             y: geneLabels,
             type: "heatmap",
             coloraxis: 'coloraxis',
@@ -497,7 +544,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     if(matrixProt.some(row => row.some(v => !isNaN(v)))){
         data.push({
             z: matrixProt,
-            x: groups,
+            x: xLabels,
             y: geneLabels,
             type: "heatmap",
             coloraxis: 'coloraxis',
@@ -511,7 +558,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const layout = {
         title: customPlotTitle || "Spatial Expression Heatmap",
         height: heatmapHeight,
-        width: 1000,
+        width: aggregationMode === "samples" ? Math.max(1000, 260 + (xLabels.length * 85)) : 1000,
         margin: {l: 220, r: 40, t: 90, b: 120},
         coloraxis: {
             colorscale: "Viridis",
@@ -531,9 +578,9 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     if(data.length === 2){
         layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
-        layout.xaxis = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
+        layout.xaxis = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
-        layout.xaxis2 = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
+        layout.xaxis2 = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis2 = {...yAxisBase, title: '', showticklabels: false};
         layout.annotations = [
             {
@@ -556,7 +603,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             }
         ];
     } else {
-        layout.xaxis = {title: 'Group', type: 'category', ticks: '', ticklen: 0};
+        layout.xaxis = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
         layout.annotations = [
             {
