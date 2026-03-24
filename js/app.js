@@ -106,6 +106,26 @@ function setupKeyboardShortcuts(){
   addCtrlEnter(document.getElementById('temporalGenes'), () => plotTemporalHeatmap());
 }
 
+function setupPValueFilterControls(){
+  const bindPValueToggle = (checkboxSelector, wrapperId) => {
+    const checkboxes = Array.from(document.querySelectorAll(checkboxSelector));
+    const wrapper = document.getElementById(wrapperId);
+    if(checkboxes.length === 0 || !wrapper) return;
+
+    const update = () => {
+      const hasPValueSelected = checkboxes.some(cb => cb.value === 'P_VALUE' && cb.checked);
+      wrapper.style.display = hasPValueSelected ? 'block' : 'none';
+    };
+
+    checkboxes.forEach(cb => cb.addEventListener('change', update));
+    update();
+  };
+
+  bindPValueToggle('.temporal-metric-checkbox', 'temporalPValueFilterWrap');
+  bindPValueToggle('.go-temporal-metric-checkbox', 'goTemporalPValueFilterWrap');
+}
+
 setupKeyboardShortcuts();
+setupPValueFilterControls();
 
 window.getCurrentViewKey = getCurrentViewKey;

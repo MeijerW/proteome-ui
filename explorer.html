@@ -158,6 +158,14 @@ Heatmap
 <label class="metric-option"><input type="checkbox" class="temporal-metric-checkbox" value="SCATTER"> SCATTER <span class="metric-help" tabindex="0" data-tooltip="Scatter/noise estimate around the fitted periodic signal (higher values indicate more variability).">?</span></label>
 </div>
 
+<div id="temporalPValueFilterWrap" class="conditional-filter" style="display:none;">
+<label for="temporalPValueFilter">P-value gene filter:</label>
+<select id="temporalPValueFilter">
+<option value="all" selected>Show all genes</option>
+<option value="significant">Show only genes with P_VALUE &lt; 0.05</option>
+</select>
+</div>
+
 <select id="heatmapRegion">
 
 <option>Posterior</option>
@@ -247,6 +255,14 @@ GO Spatiotemporal Heatmap
 <label class="metric-option"><input type="checkbox" class="go-temporal-metric-checkbox" value="OFFSET"> OFFSET <span class="metric-help" tabindex="0" data-tooltip="Baseline level (vertical offset) of the fitted periodic signal.">?</span></label>
 <label class="metric-option"><input type="checkbox" class="go-temporal-metric-checkbox" value="MEAN_PERIODICITY"> MEAN_PERIODICITY <span class="metric-help" tabindex="0" data-tooltip="Average periodicity score reported by BIO_CYCLE/JTK_CYCLE for rhythmic behavior.">?</span></label>
 <label class="metric-option"><input type="checkbox" class="go-temporal-metric-checkbox" value="SCATTER"> SCATTER <span class="metric-help" tabindex="0" data-tooltip="Scatter/noise estimate around the fitted periodic signal (higher values indicate more variability).">?</span></label>
+</div>
+
+<div id="goTemporalPValueFilterWrap" class="conditional-filter" style="display:none;">
+<label for="goTemporalPValueFilter">P-value gene filter:</label>
+<select id="goTemporalPValueFilter">
+<option value="all" selected>Show all genes</option>
+<option value="significant">Show only genes with P_VALUE &lt; 0.05</option>
+</select>
 </div>
 
 <select id="goHeatmapRegion">

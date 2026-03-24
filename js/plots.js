@@ -716,6 +716,7 @@ async function plotGoTemporalHeatmap(){
             membershipMode: getHeatmapGeneMembership("goTemporalGeneMembership"),
             aggregationMode: getAggregationMode("goTemporalAggregation"),
             selectedMetrics: getSelectedTemporalMetrics(".go-temporal-metric-checkbox"),
+            pValueFilterMode: (document.getElementById("goTemporalPValueFilter")?.value || "all"),
             plotTitle: `GO Term Spatiotemporal Heatmap - ${goId}`
         };
         plotTemporalHeatmap(matched, region, goOptions);
@@ -744,7 +745,17 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("temporalAggregation");
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("temporalGeneMembership");
     const selectedMetrics = optionsOverride?.selectedMetrics || getSelectedTemporalMetrics();
+    const pValueFilterMode = optionsOverride?.pValueFilterMode || (document.getElementById("temporalPValueFilter")?.value || "all");
+    const applyPValueFilter = selectedMetrics.includes("P_VALUE") && pValueFilterMode === "significant";
     const times = [30, 60, 90, 120];
+
+    const hasSignificantPValue = (rows) => {
+        if(!rows || rows.length === 0) return false;
+        return rows.some(row => {
+            const p = Number(row.P_VALUE);
+            return !Number.isNaN(p) && p < 0.05;
+        });
+    };
 
     const entries = [];
     genes.forEach(gene => {
@@ -754,6 +765,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const hasProt = protGene.length > 0;
         if(!hasRna && !hasProt) return;
         if(membershipMode === "both" && !(hasRna && hasProt)) return;
+        if(applyPValueFilter && !(hasSignificantPValue(rnaGene) || hasSignificantPValue(protGene))) return;
 
         entries.push({
             gene,
@@ -767,6 +779,10 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     entries.sort((a, b) => a.lagSort - b.lagSort);
 
     if(entries.length === 0){
+        if(applyPValueFilter){
+            alert("No genes passed the P_VALUE < 0.05 filter in selected region");
+            return;
+        }
         alert(membershipMode === "both"
             ? "No genes found in both RNA and Protein for current selection"
             : "No valid genes found in selected region");
