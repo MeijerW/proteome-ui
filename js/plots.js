@@ -1207,7 +1207,6 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickfont: {size: yTickFontSize},
             ticks: '',
             ticklen: 0,
-            domain: [0, 1],
             anchor: xKey,
             ticklabeloverflow: 'allow'
         };
