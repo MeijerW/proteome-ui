@@ -129,8 +129,28 @@ margin: 0 auto;
     gap:4px;
 }
 
-.meta-controls .metric-option{
+.metric-option{
     position:relative;
+}
+
+.temporal-single-controls{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px 14px;
+    margin-top:8px;
+}
+
+.temporal-single-controls label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+
+.temporal-single-controls select{
+    width:auto;
+    min-width:160px;
+    max-width:none;
 }
 
 .metric-help{
