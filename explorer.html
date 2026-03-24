@@ -123,6 +123,12 @@ Heatmap
 
 </select>
 
+<label class="metric-option">
+<input type="checkbox" id="temporalShowSineFit">
+Overlay BioCycle sine fit
+<span class="metric-help" tabindex="0" data-tooltip="Uses the selected gene and region BioCycle parameters (PERIOD, LAG, AMPLITUDE, OFFSET) from RNA and/or Protein rows. The overlay is computed as y = AMPLITUDE * cos(2*pi*(t - LAG)/PERIOD) + OFFSET over 0 to 150 minutes and drawn on top of the observed data.">?</span>
+</label>
+
 <button onclick="plotTemporal()">Plot</button>
 
 </div>

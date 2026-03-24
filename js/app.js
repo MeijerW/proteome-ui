@@ -125,7 +125,24 @@ function setupPValueFilterControls(){
   bindPValueToggle('.go-temporal-metric-checkbox', 'goTemporalPValueFilterWrap');
 }
 
+function setupTemporalSineFitAutoReplot(){
+  const checkbox = document.getElementById('temporalShowSineFit');
+  if(!checkbox) return;
+
+  checkbox.addEventListener('change', () => {
+    const temporalGeneInput = document.getElementById('temporalGene');
+    if(!temporalGeneInput || !temporalGeneInput.value.trim()) return;
+
+    if(typeof getCurrentViewKey === 'function' && getCurrentViewKey() !== 'temporal:temporalSingle') return;
+
+    if(typeof plotTemporal === 'function'){
+      plotTemporal();
+    }
+  });
+}
+
 setupKeyboardShortcuts();
 setupPValueFilterControls();
+setupTemporalSineFitAutoReplot();
 
 window.getCurrentViewKey = getCurrentViewKey;

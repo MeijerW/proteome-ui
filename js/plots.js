@@ -222,6 +222,57 @@ function getLagForSort(rnaGene, protGene){
     return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
+function getBiocycleFitParams(rows){
+    if(!Array.isArray(rows) || rows.length === 0) return null;
+    for(const row of rows){
+        const period = Number(row.PERIOD);
+        const lag = Number(row.LAG);
+        const amplitude = Number(row.AMPLITUDE);
+        const offset = Number(row.OFFSET);
+        if(Number.isNaN(period) || period === 0) continue;
+        if(Number.isNaN(lag) || Number.isNaN(amplitude) || Number.isNaN(offset)) continue;
+        const pValue = Number(row.P_VALUE);
+        const qValue = Number(row.Q_VALUE);
+        return {
+            period,
+            lag,
+            amplitude,
+            offset,
+            pValue: Number.isNaN(pValue) ? null : pValue,
+            qValue: Number.isNaN(qValue) ? null : qValue
+        };
+    }
+    return null;
+}
+
+function buildBiocycleFitTrace(rows, datasetLabel, lineColor){
+    const params = getBiocycleFitParams(rows);
+    if(!params) return null;
+
+    const timeFine = Array.from({length: 151}, (_, i) => i);
+    const fittedValues = timeFine.map(t => {
+        return params.amplitude * Math.cos((2 * Math.PI * (t - params.lag)) / params.period) + params.offset;
+    });
+
+    const pText = params.pValue === null ? "" : `, p=${params.pValue.toFixed(4)}`;
+    const qText = params.qValue === null ? "" : `, q=${params.qValue.toFixed(4)}`;
+
+    return {
+        x: timeFine,
+        y: fittedValues,
+        mode: "lines",
+        type: "scatter",
+        name: `${datasetLabel} BioCycle fit${pText}${qText}`,
+        legendgroup: datasetLabel,
+        showlegend: true,
+        line: {
+            color: lineColor,
+            width: 2.5
+        },
+        hovertemplate: `${datasetLabel} BioCycle fit<br>Time: %{x:.1f} min<br>Fitted: %{y:.3f}<extra></extra>`
+    };
+}
+
 function plotTemporal(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -245,6 +296,7 @@ function plotTemporal(){
     const protTraces = [];
     const times = [30, 60, 90, 120];
     const timeLabels = times.map(String);
+    const showSineFit = !!document.getElementById("temporalShowSineFit")?.checked;
 
     // RNA traces (box + points)
     if(rnaGene.length > 0){
@@ -252,7 +304,7 @@ function plotTemporal(){
             const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
             if(yVals.length > 0){
                 rnaTraces.push({
-                    x: Array(yVals.length).fill(String(time)),
+                    x: Array(yVals.length).fill(time),
                     y: yVals,
                     type: "box",
                     name: "RNA",
@@ -266,7 +318,7 @@ function plotTemporal(){
         });
         // Stripplot points
         rnaTraces.push({
-            x: rnaGene.map(d => String(d.time)),
+            x: rnaGene.map(d => Number(d.time)),
             y: rnaGene.map(d => d.value),
             mode: "markers",
             type: "scatter",
@@ -275,6 +327,11 @@ function plotTemporal(){
             showlegend: false,
             marker: {color: "#d5af34", size: 6, opacity: 0.8}
         });
+
+        if(showSineFit){
+            const rnaFit = buildBiocycleFitTrace(rnaGene, "RNA", "#8c6d1f");
+            if(rnaFit) rnaTraces.push(rnaFit);
+        }
     }
 
     // Protein traces (box + points)
@@ -283,7 +340,7 @@ function plotTemporal(){
             const yVals = protGene.filter(d => d.time === time).map(d => d.value);
             if(yVals.length > 0){
                 protTraces.push({
-                    x: Array(yVals.length).fill(String(time)),
+                    x: Array(yVals.length).fill(time),
                     y: yVals,
                     type: "box",
                     name: "Protein",
@@ -296,7 +353,7 @@ function plotTemporal(){
             }
         });
         protTraces.push({
-            x: protGene.map(d => String(d.time)),
+            x: protGene.map(d => Number(d.time)),
             y: protGene.map(d => d.value),
             mode: "markers",
             type: "scatter",
@@ -305,6 +362,11 @@ function plotTemporal(){
             showlegend: false,
             marker: {color: "#8281be", size: 6, opacity: 0.8}
         });
+
+        if(showSineFit){
+            const protFit = buildBiocycleFitTrace(protGene, "Protein", "#4f4e8f");
+            if(protFit) protTraces.push(protFit);
+        }
     }
 
     const traces = [...rnaTraces, ...protTraces];
@@ -321,18 +383,18 @@ function plotTemporal(){
 
     if(rnaTraces.length > 0 && protTraces.length > 0){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
-        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
+        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
         layout.yaxis = {title: 'Normalized Count', automargin: true};
-        layout.xaxis2 = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
+        layout.xaxis2 = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
         layout.yaxis2 = {title: 'LFQ', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
         protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
     } else if(rnaTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
+        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
         layout.yaxis = {title: 'Normalized Count', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     } else if(protTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'category', tickmode: 'array', tickvals: timeLabels, ticktext: timeLabels};
+        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
         layout.yaxis = {title: 'LFQ', automargin: true};
         protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     }
