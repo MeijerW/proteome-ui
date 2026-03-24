@@ -977,21 +977,27 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: 40, t: 95, b: 210},
+        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 95, b: 145},
         annotations: []
     };
 
-    const buildDomainColorbar = (domain, titleText) => {
-        const domainCenter = (domain[0] + domain[1]) / 2;
-        const domainWidth = Math.max(0.06, domain[1] - domain[0]);
+    const buildDomainColorbar = (index, totalBars, titleText) => {
+        const columnCount = totalBars > 6 ? 2 : 1;
+        const rowsPerColumn = Math.ceil(totalBars / columnCount);
+        const columnIndex = Math.floor(index / rowsPerColumn);
+        const rowIndex = index % rowsPerColumn;
+        const verticalStep = 0.92 / Math.max(1, rowsPerColumn);
+        const len = Math.min(0.22, Math.max(0.11, verticalStep * 0.72));
+        const y = 0.97 - (rowIndex * verticalStep);
+
         return {
-            title: {text: titleText, side: 'top', font: {size: 10}},
-            orientation: 'h',
-            x: domainCenter,
-            xanchor: 'center',
-            y: -0.2,
+            title: {text: titleText, side: 'right', font: {size: 10}},
+            orientation: 'v',
+            x: 1.02 + (columnIndex * 0.09),
+            xanchor: 'left',
+            y,
             yanchor: 'top',
-            len: Math.max(0.06, domainWidth * 0.88),
+            len,
             thickness: 8
         };
     };
@@ -1051,7 +1057,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 yaxis: yKey,
                 zmin: -2,
                 zmax: 2,
-                colorbar: buildDomainColorbar(domain, 'Z-score')
+                colorbar: buildDomainColorbar(i, subplots.length, 'Z-score')
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
@@ -1076,7 +1082,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 hovertemplate: slot.metric === "PERIOD"
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
-                colorbar: buildDomainColorbar(domain, scaleConfig.colorbarTitle)
+                colorbar: buildDomainColorbar(i, subplots.length, scaleConfig.colorbarTitle)
             });
 
             // Keep numeric values visible regardless of heatmap text rendering support
@@ -1105,7 +1111,13 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         });
     });
 
-    Plotly.newPlot("plot", traces, layout);
+    try {
+        Plotly.newPlot("plot", traces, layout);
+    } catch (err) {
+        console.error("Temporal heatmap rendering failed", err);
+        alert(`Failed to render spatiotemporal heatmap: ${err.message}`);
+        return;
+    }
     saveCurrentViewPlot();
 }
 
