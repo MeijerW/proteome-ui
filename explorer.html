@@ -115,6 +115,7 @@ Heatmap
 
 <input id="temporalGene" list="genes-temporal">
 
+<p class="region-prompt">Which region would you like to look at?</p>
 <div class="temporal-single-controls">
 <select id="region">
 
@@ -174,6 +175,7 @@ Overlay BioCycle sine fit
 </select>
 </div>
 
+<p class="region-prompt">Which region would you like to look at?</p>
 <select id="heatmapRegion">
 
 <option>Posterior</option>
@@ -212,7 +214,9 @@ GO Spatiotemporal Heatmap
 <label for="goTermInput">GO term (ID or keyword):</label>
 <input id="goTermInput" placeholder="e.g. GO:0007049 or cell cycle" list="goTerms">
 <button onclick="searchGoTerm()">Search GO term</button>
-<div id="goSearchStatus" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
+<p class="go-timing-note">&#9432; Gene annotations are fetched from EBI QuickGO. Large GO terms may take 1&ndash;2 minutes to load &mdash; please be patient.</p>
+<div id="goSearchStatus" style="margin-top: 6px; font-size: 0.9rem; color: #555;"></div>
+<div id="goSpatialProgressWrap" class="go-progress-wrap" style="display:none;"><div id="goSpatialProgressBar" class="go-progress-bar"></div></div>
 
 <label for="goSpatialGeneMembership">Gene set:</label>
 <select id="goSpatialGeneMembership">
@@ -226,7 +230,7 @@ GO Spatiotemporal Heatmap
 <option value="samples">Individual samples (if available)</option>
 </select>
 
-<button onclick="plotGoSpatialHeatmap()">Generate GO heatmap (Spatial)</button>
+<button id="goSpatialGenerateBtn" onclick="plotGoSpatialHeatmap()">Generate GO heatmap (Spatial)</button>
 <p id="goGeneCount" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
 
 </div>
@@ -239,7 +243,9 @@ GO Spatiotemporal Heatmap
 <label for="goTermInputTemporal">GO term (ID or keyword):</label>
 <input id="goTermInputTemporal" placeholder="e.g. GO:0007049 or cell cycle" list="goTerms">
 <button onclick="searchGoTerm(true)">Search GO term</button>
-<div id="goSearchStatusTemporal" style="margin-top: 10px; font-size: 0.9rem; color: #555;"></div>
+<p class="go-timing-note">&#9432; Gene annotations are fetched from EBI QuickGO. Large GO terms may take 1&ndash;2 minutes to load &mdash; please be patient.</p>
+<div id="goSearchStatusTemporal" style="margin-top: 6px; font-size: 0.9rem; color: #555;"></div>
+<div id="goTemporalProgressWrap" class="go-progress-wrap" style="display:none;"><div id="goTemporalProgressBar" class="go-progress-bar"></div></div>
 
 <label for="goTemporalGeneMembership">Gene set:</label>
 <select id="goTemporalGeneMembership">
@@ -273,13 +279,14 @@ GO Spatiotemporal Heatmap
 </select>
 </div>
 
+<p class="region-prompt">Which region would you like to look at?</p>
 <select id="goHeatmapRegion">
 <option>Posterior</option>
 <option>Anterior</option>
 <option>Somite</option>
 </select>
 
-<button onclick="plotGoTemporalHeatmap()">Generate GO heatmap (Spatiotemporal)</button>
+<button id="goTemporalGenerateBtn" onclick="plotGoTemporalHeatmap()">Generate GO heatmap (Spatiotemporal)</button>
 <p id="goGeneCountTemporal" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
 
 </div>

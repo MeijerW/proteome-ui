@@ -252,6 +252,49 @@ button:hover {
     color: #ffffff;
 }
 
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #006c70;
+    color: #fff;
+}
+
+.region-prompt {
+    margin: 10px 0 2px;
+    font-size: 0.92rem;
+    color: #444;
+    font-weight: 500;
+}
+
+.go-timing-note {
+    margin: 8px 0 4px;
+    font-size: 0.86rem;
+    color: #666;
+    background: #f5fafa;
+    border-left: 3px solid #006c70;
+    padding: 5px 10px;
+    border-radius: 0 4px 4px 0;
+    max-width: 480px;
+}
+
+.go-progress-wrap {
+    width: 100%;
+    max-width: 400px;
+    height: 6px;
+    background: #e0eded;
+    border-radius: 3px;
+    margin: 6px 0 4px;
+    overflow: hidden;
+}
+
+.go-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #006c70, #00a8ae);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
 .hero-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

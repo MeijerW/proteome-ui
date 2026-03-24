@@ -9,8 +9,10 @@ async function loadGenes(){
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     geneList = [...new Set(RNA_DATA.map(d => d.ID).filter(g => g))].sort();
-    populateDatalist('genes', geneList);
     updateTemporalGenes();
+    // Set up starts-with autocomplete for both gene inputs (replaces full-list datalist)
+    setupGeneStartsWithFilter('spatialGene', 'genes', () => geneList);
+    setupGeneStartsWithFilter('temporalGene', 'genes-temporal', () => geneListTemporal);
 }
 
 function populateDatalist(id, list){
@@ -25,10 +27,38 @@ function populateDatalist(id, list){
     }
 }
 
+// Filters the gene datalist to only genes that START WITH the current input value.
+// This replaces the browser's default contains-matching with a stricter prefix match.
+function setupGeneStartsWithFilter(inputId, datalistId, getList){
+    const input = document.getElementById(inputId);
+    const datalist = document.getElementById(datalistId);
+    if(!input || !datalist) return;
+
+    const refresh = () => {
+        const query = input.value.trim().toLowerCase();
+        datalist.innerHTML = '';
+        if(!query) return; // show nothing until the user starts typing
+        const list = getList();
+        list
+            .filter(g => g.toLowerCase().startsWith(query))
+            .slice(0, 200)
+            .forEach(gene => {
+                const opt = document.createElement('option');
+                opt.value = gene;
+                datalist.appendChild(opt);
+            });
+    };
+
+    datalist.innerHTML = ''; // clear any pre-populated options so browser can't show them
+    input.addEventListener('input', refresh);
+}
+
 function updateTemporalGenes(){
     const region = document.getElementById('region').value || document.getElementById('heatmapRegion').value;
     geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.ID).filter(g => g))].sort();
-    populateDatalist('genes-temporal', geneListTemporal);
+    // Trigger the starts-with filter to refresh with the new region's gene list
+    const input = document.getElementById('temporalGene');
+    if(input) input.dispatchEvent(new Event('input'));
 }
 
 document.getElementById('region').addEventListener('change', updateTemporalGenes);

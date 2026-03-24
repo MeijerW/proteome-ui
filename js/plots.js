@@ -659,45 +659,89 @@ async function searchGoTerm(forTemporal = false){
     }
 }
 
-async function fetchGoTermGenes(goId){
+// Fetch all gene annotations for a GO term. Remaining pages after page 1 are fetched
+// in parallel for a significant speedup over sequential fetching.
+// onProgress({done, total, symbols, cached}) is called after page 1 and when all pages finish.
+async function fetchGoTermGenes(goId, onProgress = null){
     if(GO_TERM_GENES_CACHE[goId]){
-        console.info(`[GO] Using cached genes for ${goId}: ${GO_TERM_GENES_CACHE[goId].length}`);
-        return GO_TERM_GENES_CACHE[goId];
+        const cached = GO_TERM_GENES_CACHE[goId];
+        console.info(`[GO] Using cached genes for ${goId}: ${cached.length}`);
+        if(onProgress) onProgress({done: 1, total: 1, symbols: cached.length, cached: true});
+        return cached;
     }
 
     const limit = 200; // QuickGO rejects larger limits (e.g. 500 -> HTTP 400)
     const symbols = new Set();
-    let page = 1;
-    let totalPages = 1;
+    const buildUrl = (p) => `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=${limit}&page=${p}`;
 
-    console.groupCollapsed(`[GO] Fetching genes for ${goId}`);
-    while(page <= totalPages){
-        const url = `https://www.ebi.ac.uk/QuickGO/services/annotation/search?goId=${encodeURIComponent(goId)}&taxonId=10090&limit=${limit}&page=${page}`;
-        const resp = await fetch(url, { headers: { Accept: 'application/json' } });
-        if(!resp.ok){
-            const body = await resp.text();
-            console.error(`[GO] QuickGO request failed for ${goId}`, { page, status: resp.status, body });
-            console.groupEnd();
-            throw new Error(`HTTP ${resp.status}`);
-        }
+    // Fetch page 1 to discover the total number of pages
+    const resp1 = await fetch(buildUrl(1), { headers: { Accept: 'application/json' } });
+    if(!resp1.ok){
+        const body = await resp1.text();
+        console.error(`[GO] QuickGO request failed for ${goId}`, { page: 1, status: resp1.status, body });
+        throw new Error(`HTTP ${resp1.status}`);
+    }
+    const data1 = await resp1.json();
+    (data1.results || []).forEach(r => { if(r.symbol) symbols.add(r.symbol.toLowerCase()); });
 
-        const data = await resp.json();
-        const results = data.results || [];
-        results.forEach(r => {
-            if(r.symbol) symbols.add(r.symbol.toLowerCase());
-        });
+    const hits = Number(data1.numberOfHits || (data1.results || []).length || 0);
+    const totalPages = Math.max(1, Math.ceil(hits / limit));
+    console.info(`[GO] ${goId}: ${hits} total annotations across ${totalPages} pages`);
+    if(onProgress) onProgress({done: 1, total: totalPages, symbols: symbols.size, cached: false});
 
-        const hits = Number(data.numberOfHits || results.length || 0);
-        totalPages = Math.max(1, Math.ceil(hits / limit));
-        console.info(`[GO] ${goId} page ${page}/${totalPages}: ${results.length} annotations, ${symbols.size} unique symbols so far`);
-        page += 1;
+    if(totalPages > 1){
+        // Fetch all remaining pages simultaneously — browser caps concurrent connections naturally
+        const remainingPages = Array.from({length: totalPages - 1}, (_, i) => i + 2);
+        const pageResults = await Promise.all(remainingPages.map(async (p) => {
+            const resp = await fetch(buildUrl(p), { headers: { Accept: 'application/json' } });
+            if(!resp.ok){
+                console.warn(`[GO] Page ${p} for ${goId} returned HTTP ${resp.status}, skipping`);
+                return [];
+            }
+            const d = await resp.json();
+            return (d.results || []).filter(r => r.symbol).map(r => r.symbol.toLowerCase());
+        }));
+        pageResults.forEach(syms => syms.forEach(s => symbols.add(s)));
+        if(onProgress) onProgress({done: totalPages, total: totalPages, symbols: symbols.size, cached: false});
     }
 
     const genes = Array.from(symbols);
     GO_TERM_GENES_CACHE[goId] = genes;
-    console.info(`[GO] Completed ${goId}: ${genes.length} unique symbols loaded`, genes.slice(0, 25));
-    console.groupEnd();
+    console.info(`[GO] Completed ${goId}: ${genes.length} unique symbols loaded`);
     return genes;
+}
+
+function setGoButtonLoading(buttonId, isLoading, originalText){
+    const btn = document.getElementById(buttonId);
+    if(!btn) return;
+    btn.disabled = isLoading;
+    btn.textContent = isLoading ? '⏳ Fetching annotations…' : originalText;
+}
+
+function updateGoProgress(statusId, wrapId, barId, {done, total, symbols, cached}){
+    const statusEl = document.getElementById(statusId);
+    const wrap = document.getElementById(wrapId);
+    const bar = document.getElementById(barId);
+    if(!statusEl) return;
+
+    if(cached){
+        statusEl.textContent = `Using cached annotations (${symbols} genes). Plotting…`;
+        if(wrap) wrap.style.display = 'none';
+        return;
+    }
+    if(total <= 1){
+        statusEl.textContent = `Fetched gene annotations (${symbols} unique genes). Plotting…`;
+        if(wrap) wrap.style.display = 'none';
+        return;
+    }
+    const pct = Math.round((done / total) * 100);
+    statusEl.textContent = `Fetching annotations: ${done}/${total} pages (${symbols} unique genes found so far)…`;
+    if(wrap){ wrap.style.display = 'block'; }
+    if(bar){ bar.style.width = pct + '%'; }
+    if(done >= total){
+        statusEl.textContent = `Loaded ${symbols} gene annotations across ${total} pages. Plotting…`;
+        setTimeout(() => { if(wrap) wrap.style.display = 'none'; }, 2500);
+    }
 }
 
 function getDatasetGeneSet(){
@@ -728,9 +772,12 @@ async function plotGoSpatialHeatmap(){
 
     const statusEl = document.getElementById('goSearchStatus');
     statusEl.textContent = 'Loading gene list for ' + goId + '...';
+    setGoButtonLoading('goSpatialGenerateBtn', true, 'Generate GO heatmap (Spatial)');
 
     try {
-        const genes = await fetchGoTermGenes(goId);
+        const genes = await fetchGoTermGenes(goId, (progress) => {
+            updateGoProgress('goSearchStatus', 'goSpatialProgressWrap', 'goSpatialProgressBar', progress);
+        });
         const { matched, missing } = inspectGoGenesForDataset(goId, genes);
         const geneCountEl = document.getElementById('goGeneCount');
         geneCountEl.textContent = `Found ${genes.length} GO symbols; ${matched.length} are present in this dataset (${missing} absent).`;
@@ -749,6 +796,8 @@ async function plotGoSpatialHeatmap(){
         statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
     } catch (err){
         statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
+    } finally {
+        setGoButtonLoading('goSpatialGenerateBtn', false, 'Generate GO heatmap (Spatial)');
     }
 }
 
@@ -761,9 +810,12 @@ async function plotGoTemporalHeatmap(){
 
     const statusEl = document.getElementById('goSearchStatusTemporal');
     statusEl.textContent = 'Loading gene list for ' + goId + '...';
+    setGoButtonLoading('goTemporalGenerateBtn', true, 'Generate GO heatmap (Spatiotemporal)');
 
     try {
-        const genes = await fetchGoTermGenes(goId);
+        const genes = await fetchGoTermGenes(goId, (progress) => {
+            updateGoProgress('goSearchStatusTemporal', 'goTemporalProgressWrap', 'goTemporalProgressBar', progress);
+        });
         const { matched, missing } = inspectGoGenesForDataset(goId, genes);
         const geneCountEl = document.getElementById('goGeneCountTemporal');
         geneCountEl.textContent = `Found ${genes.length} GO symbols; ${matched.length} are present in this dataset (${missing} absent).`;
@@ -785,6 +837,8 @@ async function plotGoTemporalHeatmap(){
         statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
     } catch (err){
         statusEl.textContent = `Failed to load genes for ${goId}: ${err.message}`;
+    } finally {
+        setGoButtonLoading('goTemporalGenerateBtn', false, 'Generate GO heatmap (Spatiotemporal)');
     }
 }
 
@@ -963,12 +1017,16 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     const totalGap = effectiveColumnGap * gapSlots;
     const usableDomain = Math.max(0.02, 1 - totalGap);
     const subDomains = [];
-    let cursor = 0;
+    let cumulativeWeight = 0;
     for(let i = 0; i < subplots.length; i++){
-        const width = usableDomain * (weights[i] / totalWeight);
-        const end = Math.min(1, cursor + width);
-        subDomains.push([cursor, end]);
-        cursor = end + effectiveColumnGap;
+        const gapOffset = i * effectiveColumnGap;
+        const start = (cumulativeWeight / totalWeight) * usableDomain + gapOffset;
+        cumulativeWeight += weights[i];
+        const rawEnd = (cumulativeWeight / totalWeight) * usableDomain + gapOffset;
+        // Clamp to [0,1] and guard against floating-point rounding making start >= end
+        const s = Math.max(0, Math.min(start, 0.998));
+        const e = Math.min(1, Math.max(rawEnd, s + 0.002));
+        subDomains.push([s, e]);
     }
 
     const customPlotTitle = optionsOverride?.plotTitle;
@@ -1042,8 +1100,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             ticklen: 0,
             domain: [0, 1],
             anchor: xKey,
-            ticklabeloverflow: 'allow',
-            matches: axisIndex === 1 ? undefined : 'y'
+            ticklabeloverflow: 'allow'
         };
 
         if(isExpression){
