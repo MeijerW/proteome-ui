@@ -884,22 +884,29 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
 
     const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
-    const columnGap = 0.012;
+    const baseColumnGap = 0.012;
     const weights = subplots.map(slot => {
         if(slot.kind === "expr") return 2;
         if(slot.metric === "P_VALUE" || slot.metric === "Q_VALUE") return 0.7;
         return 1;
     });
     const totalWeight = weights.reduce((a, b) => a + b, 0);
-    const totalGap = columnGap * Math.max(0, subplots.length - 1);
-    const usableDomain = Math.max(0.2, 1 - totalGap);
+    const subplotCount = subplots.length;
+    const gapSlots = Math.max(0, subplotCount - 1);
+    let effectiveColumnGap = gapSlots > 0 ? baseColumnGap : 0;
+    if(gapSlots > 0 && (effectiveColumnGap * gapSlots) >= 1){
+        // If many subplots are selected, shrink inter-column gaps to keep domains valid.
+        effectiveColumnGap = 0.98 / gapSlots;
+    }
+    const totalGap = effectiveColumnGap * gapSlots;
+    const usableDomain = Math.max(0.02, 1 - totalGap);
     const subDomains = [];
     let cursor = 0;
     for(let i = 0; i < subplots.length; i++){
         const width = usableDomain * (weights[i] / totalWeight);
         const end = Math.min(1, cursor + width);
         subDomains.push([cursor, end]);
-        cursor = end + columnGap;
+        cursor = end + effectiveColumnGap;
     }
 
     const customPlotTitle = optionsOverride?.plotTitle;
