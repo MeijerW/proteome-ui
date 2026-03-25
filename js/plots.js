@@ -1086,57 +1086,12 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
 
     const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
-    const baseColumnGap = 0.012;
     const weights = subplots.map(slot => {
         if(slot.kind === "expr") return 2;
         if(slot.metric === "P_VALUE" || slot.metric === "Q_VALUE") return 0.7;
         return 1;
     });
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-    const subplotCount = subplots.length;
-    const gapSlots = Math.max(0, subplotCount - 1);
-    let effectiveColumnGap = gapSlots > 0 ? baseColumnGap : 0;
-    if(gapSlots > 0 && (effectiveColumnGap * gapSlots) >= 1){
-        // If many subplots are selected, shrink inter-column gaps to keep domains valid.
-        effectiveColumnGap = 0.98 / gapSlots;
-    }
-    const totalGap = effectiveColumnGap * gapSlots;
-    const usableDomain = Math.max(0.05, 1 - totalGap);
-    const minWidth = 0.01;
-    const subDomains = [];
-    let cursor = 0;
-    for(let i = 0; i < subplots.length; i++){
-        const width = usableDomain * (weights[i] / totalWeight);
-        const rawStart = cursor;
-        const rawEnd = i === (subplots.length - 1) ? 1 : (rawStart + width);
-        let s = Math.max(0, Math.min(1, rawStart));
-        let e = Math.max(0, Math.min(1, rawEnd));
-        if(e - s < minWidth){
-            e = Math.min(1, s + minWidth);
-            if(e - s < minWidth){
-                s = Math.max(0, e - minWidth);
-            }
-        }
-        subDomains.push([Number(s.toFixed(6)), Number(e.toFixed(6))]);
-        cursor = e + effectiveColumnGap;
-    }
-
-    // Final guard: ensure strictly increasing domains so Plotly axis scaling cannot fail.
-    for(let i = 1; i < subDomains.length; i++){
-        if(subDomains[i][0] <= subDomains[i - 1][0]){
-            subDomains[i][0] = Number(Math.min(0.999, subDomains[i - 1][0] + minWidth).toFixed(6));
-        }
-        if(subDomains[i][1] <= subDomains[i][0]){
-            subDomains[i][1] = Number(Math.min(1, subDomains[i][0] + minWidth).toFixed(6));
-        }
-    }
-
-    console.info('[TemporalHeatmap] Axis domain summary:', {
-        gapSlots,
-        effectiveColumnGap,
-        usableDomain,
-        subDomains
-    });
+    const subplotCount = Math.max(1, subplots.length);
 
     const customPlotTitle = optionsOverride?.plotTitle;
 
@@ -1145,8 +1100,15 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         height: heatmapHeight,
         width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
         margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 95, b: 145},
+        grid: {rows: 1, columns: subplotCount, pattern: 'independent', xgap: 0.03},
         annotations: []
     };
+
+    console.info('[TemporalHeatmap] Grid summary:', {
+        rows: 1,
+        columns: subplotCount,
+        xgap: 0.03
+    });
 
     const buildDomainColorbar = (index, totalBars, titleText) => {
         const columnCount = totalBars > 6 ? 2 : 1;
@@ -1176,7 +1138,6 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         const yKey = axisIndex === 1 ? "y" : `y${axisIndex}`;
         const layoutXKey = axisIndex === 1 ? "xaxis" : `xaxis${axisIndex}`;
         const layoutYKey = axisIndex === 1 ? "yaxis" : `yaxis${axisIndex}`;
-        const domain = subDomains[i];
         const isExpression = slot.kind === "expr";
 
         layout[layoutXKey] = {
@@ -1191,7 +1152,6 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             showticklabels: isExpression,
             ticks: '',
             ticklen: 0,
-            domain,
             anchor: yKey
         };
         layout[layoutYKey] = {
@@ -1288,7 +1248,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             selectedMetrics,
             xLabelCount: xDisplayLabels.length,
             subplotCount: subplots.length,
-            domains: subDomains,
+            grid: layout.grid,
             traceCount: traces.length
         });
         console.groupEnd();
