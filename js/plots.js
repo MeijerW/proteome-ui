@@ -1151,8 +1151,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             ticktext: isExpression ? xDisplayLabels : undefined,
             showticklabels: isExpression,
             ticks: '',
-            ticklen: 0,
-            anchor: yKey
+            ticklen: 0
         };
         layout[layoutYKey] = {
             title: i === 0 ? 'Genes' : '',
@@ -1167,7 +1166,6 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
             tickfont: {size: yTickFontSize},
             ticks: '',
             ticklen: 0,
-            anchor: xKey,
             ticklabeloverflow: 'allow'
         };
 
