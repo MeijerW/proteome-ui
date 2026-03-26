@@ -573,40 +573,40 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     if(data.length === 2){
         layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
-        layout.xaxis = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
+        layout.xaxis = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
-        layout.xaxis2 = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
+        layout.xaxis2 = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis2 = {...yAxisBase, title: '', showticklabels: false};
         layout.annotations = [
             {
                 text: "RNA",
                 x: 0.5,
-                y: 1.01,
+                y: 1.03,
                 xref: 'x domain',
-                yref: 'y domain',
+                yref: 'paper',
                 showarrow: false,
                 font: {size: 16}
             },
             {
                 text: "Protein",
                 x: 0.5,
-                y: 1.01,
+                y: 1.03,
                 xref: 'x2 domain',
-                yref: 'y2 domain',
+                yref: 'paper',
                 showarrow: false,
                 font: {size: 16}
             }
         ];
     } else {
-        layout.xaxis = {title: aggregationMode === "samples" ? 'Sample' : 'Group', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
+        layout.xaxis = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
         layout.yaxis = {...yAxisBase};
         layout.annotations = [
             {
                 text: data[0] ? "RNA" : "Protein",
                 x: 0.5,
-                y: 1.01,
+                y: 1.03,
                 xref: 'x domain',
-                yref: 'y domain',
+                yref: 'paper',
                 showarrow: false,
                 font: {size: 16}
             }
@@ -1087,27 +1087,36 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
     const weights = subplots.map(slot => {
-        if(slot.kind === "expr") return 2;
-        if(slot.metric === "P_VALUE" || slot.metric === "Q_VALUE") return 0.7;
-        return 1;
+        if(slot.kind === "expr") return 1;
+        return 0.33;
     });
     const subplotCount = Math.max(1, subplots.length);
+    const columnGap = 0.02;
+    const usableWidth = 1 - (Math.max(0, subplotCount - 1) * columnGap);
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+    let domainCursor = 0;
+    const subplotDomains = weights.map((weight, index) => {
+        const domainWidth = usableWidth * (weight / totalWeight);
+        const start = domainCursor;
+        const end = index === subplotCount - 1 ? 1 : Math.min(1, start + domainWidth);
+        domainCursor = end + columnGap;
+        return [start, end];
+    });
 
     const customPlotTitle = optionsOverride?.plotTitle;
 
     const layout = {
         title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
-        width: Math.max(900, 220 + (weights.reduce((sum, w) => sum + (w * 170), 0))),
-        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 95, b: 145},
-        grid: {rows: 1, columns: subplotCount, pattern: 'independent', xgap: 0.03},
+        width: Math.max(900, 340 + (weights.reduce((sum, w) => sum + (w * 260), 0))),
+        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 120, b: 145},
         annotations: []
     };
 
-    console.info('[TemporalHeatmap] Grid summary:', {
-        rows: 1,
-        columns: subplotCount,
-        xgap: 0.03
+    console.info('[TemporalHeatmap] Domain summary:', {
+        subplotCount,
+        columnGap,
+        domains: subplotDomains
     });
 
     const buildDomainColorbar = (index, totalBars, titleText) => {
@@ -1146,8 +1155,9 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             title: isExpression
                 ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
                 : '',
+            domain: subplotDomains[i],
             type: 'category',
-            tickangle: isExpression ? 0 : -45,
+            tickangle: -45,
             tickmode: isExpression ? 'array' : undefined,
             tickvals: isExpression ? xDisplayLabels : undefined,
             ticktext: isExpression ? xDisplayLabels : undefined,
@@ -1220,9 +1230,9 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         layout.annotations.push({
             text: `<b>${slot.title}</b>`,
             x: 0.5,
-            y: 1.01,
+            y: 1.035,
             xref: `${xKey} domain`,
-            yref: `${yKey} domain`,
+            yref: 'paper',
             showarrow: false,
             font: {size: 13}
         });
@@ -1240,7 +1250,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             selectedMetrics,
             xLabelCount: xDisplayLabels.length,
             subplotCount: subplots.length,
-            grid: layout.grid,
+            domains: subplotDomains,
             traceCount: traces.length
         });
         console.groupEnd();
