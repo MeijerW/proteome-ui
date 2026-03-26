@@ -1207,20 +1207,6 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
                 colorbar: buildDomainColorbar(i, subplots.length, scaleConfig.colorbarTitle)
             });
-
-            // Keep numeric values visible regardless of heatmap text rendering support
-            traces.push({
-                x: Array(geneLabels.length).fill(slot.metric),
-                y: geneLabels,
-                type: "scatter",
-                mode: "text",
-                text: metricText,
-                textfont: {size: 10, color: "#111"},
-                hoverinfo: "skip",
-                showlegend: false,
-                xaxis: xKey,
-                yaxis: yKey
-            });
         }
 
         layout.annotations.push({
