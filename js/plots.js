@@ -881,7 +881,7 @@ async function plotGoTemporalHeatmap(){
             pValueFilterMode: (document.getElementById("goTemporalPValueFilter")?.value || "all"),
             plotTitle: `GO Term Spatiotemporal Heatmap - ${goId}`
         };
-        plotTemporalHeatmap(matched, region, goOptions);
+        renderTemporalHeatmapFromGenes(matched, region, goOptions);
         statusEl.textContent = `Plotted ${matched.length} dataset-matched genes for GO term ${goId}.`;
         console.info('[GO Temporal] Passed matched genes to plotTemporalHeatmap.', { region, metrics: goOptions.selectedMetrics });
     } catch (err){
@@ -893,7 +893,7 @@ async function plotGoTemporalHeatmap(){
     }
 }
 
-function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = null){
+function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = null){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
         return;
@@ -901,14 +901,14 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
 
     clearTemporalStatsPanel();
 
-    const genesText = overrideGenes ? overrideGenes.join(',') : document.getElementById("temporalGenes").value.trim();
-    if(!genesText){
+    const genes = Array.isArray(inputGenes)
+        ? Array.from(new Set(inputGenes.map(g => String(g).trim().toLowerCase()).filter(g => g)))
+        : [];
+    if(genes.length === 0){
         alert("Enter genes");
         return;
     }
 
-    const region = regionOverride || document.getElementById("heatmapRegion").value;
-    const genes = Array.from(new Set(genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g)));
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("temporalAggregation");
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("temporalGeneMembership");
     const selectedMetrics = optionsOverride?.selectedMetrics || getSelectedTemporalMetrics();
@@ -918,7 +918,7 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
 
     console.groupCollapsed(`[TemporalHeatmap] Start | region=${region}`);
     console.info('[TemporalHeatmap] Input genes:', {
-        rawGeneTextLength: genesText.length,
+        rawGeneTextLength: genes.join(',').length,
         parsedGenes: genes.length,
         aggregationMode,
         membershipMode,
@@ -1132,6 +1132,8 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     };
 
     const traces = [];
+    let expressionColorbarShown = false;
+    const shownMetricColorbars = new Set();
     subplots.forEach((slot, i) => {
         const axisIndex = i + 1;
         const xKey = axisIndex === 1 ? "x" : `x${axisIndex}`;
@@ -1170,6 +1172,8 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
         };
 
         if(isExpression){
+            const showColorbar = !expressionColorbarShown;
+            expressionColorbarShown = true;
             traces.push({
                 z: slot.dataset === "RNA" ? matrixRNA : matrixProt,
                 x: xDisplayLabels,
@@ -1180,13 +1184,16 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 yaxis: yKey,
                 zmin: -2,
                 zmax: 2,
-                colorbar: buildDomainColorbar(i, subplots.length, 'Z-score')
+                showscale: showColorbar,
+                colorbar: showColorbar ? buildDomainColorbar(i, subplots.length, 'Z-score') : undefined
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
             const metricZValues = getMetricZValues(slot.metric, metricValues);
             const scaleConfig = getMetricScaleConfig(slot.metric);
             const metricText = metricValues.map(v => formatMetricCell(v));
+            const showColorbar = !shownMetricColorbars.has(slot.metric);
+            shownMetricColorbars.add(slot.metric);
             traces.push({
                 z: metricZValues.map(v => [v]),
                 x: [slot.metric],
@@ -1205,7 +1212,8 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
                 hovertemplate: slot.metric === "PERIOD"
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
-                colorbar: buildDomainColorbar(i, subplots.length, scaleConfig.colorbarTitle)
+                showscale: showColorbar,
+                colorbar: showColorbar ? buildDomainColorbar(i, subplots.length, scaleConfig.colorbarTitle) : undefined
             });
         }
 
@@ -1242,6 +1250,14 @@ function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = nu
     console.info('[TemporalHeatmap] Plot rendered successfully.', { traceCount: traces.length, genes: entries.length });
     console.groupEnd();
     saveCurrentViewPlot();
+}
+
+function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = null){
+    const genes = Array.isArray(overrideGenes)
+        ? overrideGenes
+        : document.getElementById("temporalGenes").value.trim().split(',');
+    const region = regionOverride || document.getElementById("heatmapRegion").value;
+    return renderTemporalHeatmapFromGenes(genes, region, optionsOverride);
 }
 
 // Expose key functions to the global scope (for inline onclick handlers)
