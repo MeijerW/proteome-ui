@@ -72,8 +72,12 @@ function plotSpatial(){
 
     const traces = [];
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
+    const spatialDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
+        : rnaGene.length > 0 ? " — RNA"
+        : " — Protein";
     const layout = {
-        title: `Spatial Expression - ${displayGene}`,
+        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}`,
+        showlegend: true,
         template: "simple_white",
         height: 600,
         width: 800
@@ -371,9 +375,12 @@ function plotTemporal(){
 
     const traces = [...rnaTraces, ...protTraces];
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
+    const temporalDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
+        : rnaGene.length > 0 ? " — RNA"
+        : " — Protein";
 
     const layout = {
-        title: `Spatiotemporal Expression - ${displayGene} (${region})`,
+        title: `Spatiotemporal Expression - ${displayGene} (${region})${temporalDatasetSuffix}`,
         template: "simple_white",
         height: 600,
         width: 800,
