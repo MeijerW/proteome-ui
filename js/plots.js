@@ -66,6 +66,42 @@ function formatSpatialCorrelation(value){
     return Number.isFinite(value) ? value.toFixed(4) : "unavailable";
 }
 
+function getSpatialCorrelationBand(value){
+    if(!Number.isFinite(value)) return "unavailable";
+    if(value > 0.5) return "highly correlated";
+    if(value < -0.5) return "anti-correlated";
+    return "lowly correlated";
+}
+
+function buildSpatialCorrelationGuideAnnotation({ x = 1.02, y = 1.0, xanchor = 'left' } = {}){
+    return {
+        x,
+        y,
+        xref: 'paper',
+        yref: 'paper',
+        xanchor,
+        yanchor: 'top',
+        align: 'left',
+        showarrow: false,
+        bgcolor: 'rgba(255,255,255,0.92)',
+        bordercolor: '#c7c2b8',
+        borderwidth: 1,
+        borderpad: 8,
+        font: {size: 11, color: '#40362e'},
+        text: '<b>Rho guide</b><br>rho &gt; 0.5: highly correlated<br>-0.5 ≤ rho ≤ 0.5: lowly correlated<br>rho &lt; -0.5: anti-correlated'
+    };
+}
+
+const SPATIAL_RHO_COLORSCALE = [
+    [0.0, '#020106'],
+    [0.12, '#16081f'],
+    [0.28, '#41106f'],
+    [0.5, '#8f2f8f'],
+    [0.72, '#f26d5b'],
+    [0.88, '#fdbb84'],
+    [1.0, '#ffffbf']
+];
+
 function plotSpatial(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -87,15 +123,18 @@ function plotSpatial(){
     const traces = [];
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
     const rhoValue = getSpatialCorrelationValue(displayGene);
+    const rhoBand = getSpatialCorrelationBand(rhoValue);
     const spatialDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
         : rnaGene.length > 0 ? " — RNA"
         : " — Protein";
     const layout = {
-        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}<br><sup>RNA-protein rho correlation: ${formatSpatialCorrelation(rhoValue)}</sup>`,
+        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}<br><sup>RNA-protein rho correlation: ${formatSpatialCorrelation(rhoValue)} (${rhoBand})</sup>`,
         showlegend: true,
         template: "simple_white",
         height: 600,
-        width: 800
+        width: 960,
+        margin: {l: 80, r: 220, t: 90, b: 80},
+        annotations: [buildSpatialCorrelationGuideAnnotation()]
     };
 
     const order = ['Posterior', 'Anterior', 'Somite'];
@@ -587,6 +626,32 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     const customPlotTitle = optionsOverride?.plotTitle;
     const hasRhoPanel = panels.some(panel => panel.coloraxis === 'coloraxis2');
+    const panelDomains = (() => {
+        if(panels.length === 0) return [];
+
+        if(!hasRhoPanel){
+            const gap = panels.length > 1 ? 0.04 : 0;
+            const width = (1 - (gap * (panels.length - 1))) / panels.length;
+            return panels.map((_, index) => {
+                const start = index * (width + gap);
+                return [start, start + width];
+            });
+        }
+
+        const gap = panels.length > 1 ? 0.035 : 0;
+        const rhoWidth = 0.10;
+        const nonRhoCount = panels.filter(panel => panel.coloraxis !== 'coloraxis2').length;
+        const remainingWidth = 1 - rhoWidth - (gap * (panels.length - 1));
+        const mainWidth = nonRhoCount > 0 ? remainingWidth / nonRhoCount : remainingWidth;
+
+        let currentStart = 0;
+        return panels.map(panel => {
+            const width = panel.coloraxis === 'coloraxis2' ? rhoWidth : mainWidth;
+            const domain = [currentStart, currentStart + width];
+            currentStart += width + gap;
+            return domain;
+        });
+    })();
 
     const layout = {
         title: customPlotTitle || "Spatial Expression Heatmap",
@@ -609,7 +674,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             }
         },
         coloraxis2: {
-            colorscale: "RdBu",
+            colorscale: SPATIAL_RHO_COLORSCALE,
             cmin: -1,
             cmax: 1,
             cmid: 0,
@@ -621,13 +686,18 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
                 y: 0.5,
                 yanchor: 'middle',
                 len: 0.4,
-                thickness: 10
+                thickness: 10,
+                tickmode: 'array',
+                tickvals: [-1, -0.5, 0, 0.5, 1],
+                ticktext: ['-1', '-0.5', '0', '0.5', '1']
             }
         },
         annotations: []
     };
 
-    layout.grid = {rows: 1, columns: panels.length, pattern: 'independent'};
+    if(hasRhoPanel){
+        layout.annotations.push(buildSpatialCorrelationGuideAnnotation({x: 1.18, y: 1.0}));
+    }
 
     const data = panels.map((panel, index) => {
         const axisSuffix = index === 0 ? '' : String(index + 1);
@@ -638,6 +708,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         layout[xAxisName] = {
             title: '',
             type: 'category',
+            domain: panelDomains[index],
             tickangle: tickAngle,
             ticks: '',
             ticklen: 0
