@@ -1279,9 +1279,6 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             domain: subplotDomains[i],
             type: 'category',
             tickangle: -45,
-            tickmode: isExpression ? 'array' : undefined,
-            tickvals: isExpression ? xDisplayLabels : undefined,
-            ticktext: isExpression ? xDisplayLabels : undefined,
             showticklabels: isExpression,
             ticks: '',
             ticklen: 0
@@ -1290,16 +1287,12 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             title: i === 0 ? 'Genes' : '',
             type: 'category',
             automargin: true,
-            tickmode: 'array',
-            tickvals: geneLabels,
-            ticktext: geneLabels,
             categoryorder: 'array',
             categoryarray: geneLabels,
             showticklabels: i === 0,
             tickfont: {size: yTickFontSize},
             ticks: '',
-            ticklen: 0,
-            ticklabeloverflow: 'allow'
+            ticklen: 0
         };
 
         if(isExpression){
