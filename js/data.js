@@ -6,8 +6,8 @@ let PROT_DATA = []
 let RHO_CORRELATION_DATA = new Map()
 
 const SPATIAL_DATASETS = {
-    RNA: "rna_zscore.csv",
-    PROTEIN: "prot_zscore.csv",
+    RNA: "rna_zscore_long.csv",
+    PROTEIN: "prot_zscore_long.csv",
     RHO: "Rho-correlation.txt"
 }
 
@@ -57,12 +57,20 @@ function getSpatialExpressionValue(row){
     return Number.isNaN(numericValue) ? NaN : numericValue;
 }
 
-function mapSpatialRow(row){
-    return {
+function parseSpatialCsv(text){
+    const rows = Papa.parse(text, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true
+    }).data;
+
+    return rows.map(row => ({
         ID: row.Gene || row.ID,
         group: row.group || row.Group || row.region || row.Region,
+        sample: row.sample || row.Sample || null,
+        replicate: row.replicate || row.Replicate || null,
         spatialValue: getSpatialExpressionValue(row)
-    };
+    }));
 }
 
 async function loadData(){
@@ -73,24 +81,14 @@ if(!rnaCsv.ok){
 throw new Error(`Failed to load ${SPATIAL_DATASETS.RNA}: HTTP ${rnaCsv.status}`)
 }
 const rnaCsvText = await rnaCsv.text()
-const rnaCsvData = Papa.parse(rnaCsvText,{
-header:true,
-dynamicTyping:true,
-skipEmptyLines:true
-}).data
-RNA_DATA = rnaCsvData.map(mapSpatialRow)
+RNA_DATA = parseSpatialCsv(rnaCsvText)
 
 const protCsv = await fetch(BASE + SPATIAL_DATASETS.PROTEIN)
 if(!protCsv.ok){
 throw new Error(`Failed to load ${SPATIAL_DATASETS.PROTEIN}: HTTP ${protCsv.status}`)
 }
 const protCsvText = await protCsv.text()
-const protCsvData = Papa.parse(protCsvText,{
-header:true,
-dynamicTyping:true,
-skipEmptyLines:true
-}).data
-PROT_DATA = protCsvData.map(mapSpatialRow)
+PROT_DATA = parseSpatialCsv(protCsvText)
 
 const rhoFile = await fetch(BASE + SPATIAL_DATASETS.RHO)
 if(!rhoFile.ok){
