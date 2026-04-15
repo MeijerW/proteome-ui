@@ -52,6 +52,20 @@ function restorePlotStateForView(viewKey){
     }
 }
 
+function getSpatialCorrelationEntry(gene){
+    if(!gene || typeof RHO_CORRELATION_DATA === "undefined" || !(RHO_CORRELATION_DATA instanceof Map)) return null;
+    return RHO_CORRELATION_DATA.get(String(gene).trim().toLowerCase()) || null;
+}
+
+function getSpatialCorrelationValue(gene){
+    const entry = getSpatialCorrelationEntry(gene);
+    return entry && Number.isFinite(entry.value) ? entry.value : NaN;
+}
+
+function formatSpatialCorrelation(value){
+    return Number.isFinite(value) ? value.toFixed(4) : "unavailable";
+}
+
 function plotSpatial(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -72,11 +86,12 @@ function plotSpatial(){
 
     const traces = [];
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
+    const rhoValue = getSpatialCorrelationValue(displayGene);
     const spatialDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
         : rnaGene.length > 0 ? " — RNA"
         : " — Protein";
     const layout = {
-        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}`,
+        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}<br><sup>RNA-protein rho correlation: ${formatSpatialCorrelation(rhoValue)}</sup>`,
         showlegend: true,
         template: "simple_white",
         height: 600,
@@ -89,7 +104,7 @@ function plotSpatial(){
         rnaGene.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
         traces.push({
             x: rnaGene.map(d => d.group),
-            y: rnaGene.map(d => d["Z-score"]),
+            y: rnaGene.map(d => d.spatialValue),
             type: "box",
             name: "RNA",
             marker: {color: "#d5af34"}
@@ -100,7 +115,7 @@ function plotSpatial(){
         protGene.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
         traces.push({
             x: protGene.map(d => d.group),
-            y: protGene.map(d => d["Z-score"]),
+            y: protGene.map(d => d.spatialValue),
             type: "box",
             name: "Protein",
             marker: {color: "#8281be"}
@@ -430,7 +445,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("spatialGeneMembership");
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("spatialAggregation");
 
-    const toZScore = (row) => Number(row["Z-score"]);
+    const toZScore = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
     const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
 
     const entries = [];
@@ -452,7 +467,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             label: rnaGene[0]?.ID || protGene[0]?.ID,
             rnaGene,
             protGene,
-            posteriorSort
+            posteriorSort,
+            rhoValue: getSpatialCorrelationValue(rnaGene[0]?.ID || protGene[0]?.ID || gene)
         });
     });
 
@@ -509,6 +525,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const geneLabels = entries.map(e => e.label);
     const matrixRNA = entries.map(e => buildRow(e.rnaGene));
     const matrixProt = entries.map(e => buildRow(e.protGene));
+    const matrixRho = entries.map(e => [e.rhoValue]);
+    const rhoText = entries.map(e => [Number.isFinite(e.rhoValue) ? e.rhoValue.toFixed(2) : ""]);
 
     if(matrixRNA.length === 0 && matrixProt.length === 0){
         alert(membershipMode === "both"
@@ -531,37 +549,52 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         ticklen: 0
     };
 
-    const data = [];
+    const panels = [];
     if(matrixRNA.some(row => row.some(v => !isNaN(v)))){
-        data.push({
+        panels.push({
+            title: "RNA",
             z: matrixRNA,
             x: xLabels,
             y: geneLabels,
             type: "heatmap",
             coloraxis: 'coloraxis',
-            xaxis: 'x',
-            yaxis: 'y'
         });
     }
     if(matrixProt.some(row => row.some(v => !isNaN(v)))){
-        data.push({
+        panels.push({
+            title: "Protein",
             z: matrixProt,
             x: xLabels,
             y: geneLabels,
             type: "heatmap",
             coloraxis: 'coloraxis',
-            xaxis: data.length === 0 ? 'x' : 'x2',
-            yaxis: data.length === 0 ? 'y' : 'y2'
+        });
+    }
+    if(matrixRho.some(row => row.some(v => !isNaN(v)))){
+        panels.push({
+            title: "Rho correlation",
+            z: matrixRho,
+            x: ['Rho'],
+            y: geneLabels,
+            type: "heatmap",
+            coloraxis: 'coloraxis2',
+            text: rhoText,
+            texttemplate: '%{text}',
+            textfont: {size: Math.max(8, Math.min(12, yTickFontSize + 1))},
+            hovertemplate: 'Gene: %{y}<br>Rho: %{z:.4f}<extra></extra>'
         });
     }
 
     const customPlotTitle = optionsOverride?.plotTitle;
+    const hasRhoPanel = panels.some(panel => panel.coloraxis === 'coloraxis2');
 
     const layout = {
         title: customPlotTitle || "Spatial Expression Heatmap",
         height: heatmapHeight,
-        width: aggregationMode === "samples" ? Math.max(1000, 260 + (xLabels.length * 85)) : 1000,
-        margin: {l: 220, r: 40, t: 90, b: 120},
+        width: aggregationMode === "samples"
+            ? Math.max(hasRhoPanel ? 1260 : 1000, 260 + (xLabels.length * 85) + (hasRhoPanel ? 180 : 0))
+            : (hasRhoPanel ? 1180 : 1000),
+        margin: {l: 220, r: hasRhoPanel ? 120 : 40, t: 90, b: 120},
         coloraxis: {
             colorscale: "Viridis",
             colorbar: {
@@ -575,50 +608,60 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
                 thickness: 10
             }
         },
+        coloraxis2: {
+            colorscale: "RdBu",
+            cmin: -1,
+            cmax: 1,
+            cmid: 0,
+            colorbar: {
+                title: {text: "Rho", side: "right", font: {size: 11}},
+                orientation: 'v',
+                x: 1.1,
+                xanchor: 'left',
+                y: 0.5,
+                yanchor: 'middle',
+                len: 0.4,
+                thickness: 10
+            }
+        },
         annotations: []
     };
 
-    if(data.length === 2){
-        layout.grid = {rows: 1, columns: 2, pattern: 'independent'};
-        layout.xaxis = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
-        layout.yaxis = {...yAxisBase};
-        layout.xaxis2 = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
-        layout.yaxis2 = {...yAxisBase, title: '', showticklabels: false};
-        layout.annotations = [
-            {
-                text: "RNA",
-                x: 0.5,
-                y: 1.03,
-                xref: 'x domain',
-                yref: 'paper',
-                showarrow: false,
-                font: {size: 16}
-            },
-            {
-                text: "Protein",
-                x: 0.5,
-                y: 1.03,
-                xref: 'x2 domain',
-                yref: 'paper',
-                showarrow: false,
-                font: {size: 16}
-            }
-        ];
-    } else {
-        layout.xaxis = {title: '', type: 'category', tickangle: aggregationMode === "samples" ? -45 : 0, ticks: '', ticklen: 0};
-        layout.yaxis = {...yAxisBase};
-        layout.annotations = [
-            {
-                text: data[0] ? "RNA" : "Protein",
-                x: 0.5,
-                y: 1.03,
-                xref: 'x domain',
-                yref: 'paper',
-                showarrow: false,
-                font: {size: 16}
-            }
-        ];
-    }
+    layout.grid = {rows: 1, columns: panels.length, pattern: 'independent'};
+
+    const data = panels.map((panel, index) => {
+        const axisSuffix = index === 0 ? '' : String(index + 1);
+        const xAxisName = `xaxis${axisSuffix}`;
+        const yAxisName = `yaxis${axisSuffix}`;
+        const tickAngle = panel.coloraxis === 'coloraxis2' ? 0 : (aggregationMode === "samples" ? -45 : 0);
+
+        layout[xAxisName] = {
+            title: '',
+            type: 'category',
+            tickangle: tickAngle,
+            ticks: '',
+            ticklen: 0
+        };
+        layout[yAxisName] = index === 0
+            ? {...yAxisBase}
+            : {...yAxisBase, title: '', showticklabels: false};
+
+        layout.annotations.push({
+            text: panel.title,
+            x: 0.5,
+            y: 1.03,
+            xref: index === 0 ? 'x domain' : `x${index + 1} domain`,
+            yref: 'paper',
+            showarrow: false,
+            font: {size: 16}
+        });
+
+        return {
+            ...panel,
+            xaxis: index === 0 ? 'x' : `x${index + 1}`,
+            yaxis: index === 0 ? 'y' : `y${index + 1}`
+        };
+    });
 
     Plotly.newPlot("plot", data, layout);
     saveCurrentViewPlot();

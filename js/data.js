@@ -3,35 +3,101 @@ const BASE =
 
 let RNA_DATA = []
 let PROT_DATA = []
+let RHO_CORRELATION_DATA = new Map()
+
+const SPATIAL_DATASETS = {
+    RNA: "rna_zscore.csv",
+    PROTEIN: "prot_zscore.csv",
+    RHO: "Rho-correlation.txt"
+}
+
+function cleanQuotedValue(value){
+    return String(value || "").trim().replace(/^"|"$/g, "");
+}
+
+function parseRhoCorrelationText(text){
+    const rhoMap = new Map();
+    const lines = String(text || "").split(/\r?\n/).map(line => line.trim()).filter(line => line);
+
+    lines.forEach((line, index) => {
+        if(index === 0 && cleanQuotedValue(line).toLowerCase() === "diag") return;
+
+        const parts = line.split('\t');
+        if(parts.length < 2) return;
+
+        const gene = cleanQuotedValue(parts[0]);
+        const rhoValue = Number(parts[parts.length - 1]);
+        if(!gene || Number.isNaN(rhoValue)) return;
+
+        rhoMap.set(gene.toLowerCase(), {
+            gene,
+            value: rhoValue
+        });
+    });
+
+    return rhoMap;
+}
+
+function getSpatialExpressionValue(row){
+    const candidates = [
+        row["Z-score"],
+        row["Z_score"],
+        row["z_score"],
+        row["zscore"],
+        row["ZScore"],
+        row["zScore"],
+        row.value,
+        row.VALUE
+    ];
+
+    const match = candidates.find(value => value !== undefined && value !== null && value !== "");
+    if(match === undefined) return NaN;
+
+    const numericValue = Number(match);
+    return Number.isNaN(numericValue) ? NaN : numericValue;
+}
+
+function mapSpatialRow(row){
+    return {
+        ID: row.Gene || row.ID,
+        group: row.group || row.Group || row.region || row.Region,
+        spatialValue: getSpatialExpressionValue(row)
+    };
+}
 
 async function loadData(){
 
-// Load spatial data from CSV
-const rnaCsv = await fetch(BASE+"RNA_preprocessed.csv")
+// Load pre-z-scored spatial data from CSV
+const rnaCsv = await fetch(BASE + SPATIAL_DATASETS.RNA)
+if(!rnaCsv.ok){
+throw new Error(`Failed to load ${SPATIAL_DATASETS.RNA}: HTTP ${rnaCsv.status}`)
+}
 const rnaCsvText = await rnaCsv.text()
 const rnaCsvData = Papa.parse(rnaCsvText,{
 header:true,
 dynamicTyping:true,
 skipEmptyLines:true
 }).data
-RNA_DATA = rnaCsvData.map(row => ({
-    ID: row.Gene,
-    group: row.group,
-    "Z-score": row["Z-score"]
-}))
+RNA_DATA = rnaCsvData.map(mapSpatialRow)
 
-const protCsv = await fetch(BASE+"Protein_preprocessed.csv")
+const protCsv = await fetch(BASE + SPATIAL_DATASETS.PROTEIN)
+if(!protCsv.ok){
+throw new Error(`Failed to load ${SPATIAL_DATASETS.PROTEIN}: HTTP ${protCsv.status}`)
+}
 const protCsvText = await protCsv.text()
 const protCsvData = Papa.parse(protCsvText,{
 header:true,
 dynamicTyping:true,
 skipEmptyLines:true
 }).data
-PROT_DATA = protCsvData.map(row => ({
-    ID: row.Gene,
-    group: row.group,
-    "Z-score": row["Z-score"]
-}))
+PROT_DATA = protCsvData.map(mapSpatialRow)
+
+const rhoFile = await fetch(BASE + SPATIAL_DATASETS.RHO)
+if(!rhoFile.ok){
+throw new Error(`Failed to load ${SPATIAL_DATASETS.RHO}: HTTP ${rhoFile.status}`)
+}
+const rhoText = await rhoFile.text()
+RHO_CORRELATION_DATA = parseRhoCorrelationText(rhoText)
 
 // Load spatiotemporal data from TSV and add
 const rnaFiles = [
