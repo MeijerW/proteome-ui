@@ -1212,17 +1212,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         return 0.33;
     });
     const subplotCount = Math.max(1, subplots.length);
-    const columnGap = 0.02;
-    const usableWidth = 1 - (Math.max(0, subplotCount - 1) * columnGap);
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-    let domainCursor = 0;
-    const subplotDomains = weights.map((weight, index) => {
-        const domainWidth = usableWidth * (weight / totalWeight);
-        const start = domainCursor;
-        const end = index === subplotCount - 1 ? 1 : Math.min(1, start + domainWidth);
-        domainCursor = end + columnGap;
-        return [start, end];
-    });
 
     const customPlotTitle = optionsOverride?.plotTitle;
 
@@ -1231,13 +1221,18 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         height: heatmapHeight,
         width: Math.max(900, 340 + (weights.reduce((sum, w) => sum + (w * 260), 0))),
         margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 120, b: 145},
+        grid: {
+            rows: 1,
+            columns: subplotCount,
+            pattern: 'independent',
+            columnwidth: weights
+        },
         annotations: []
     };
 
-    console.info('[TemporalHeatmap] Domain summary:', {
+    console.info('[TemporalHeatmap] Grid summary:', {
         subplotCount,
-        columnGap,
-        domains: subplotDomains
+        weights
     });
 
     const buildDomainColorbar = (index, totalBars, titleText) => {
@@ -1276,7 +1271,6 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             title: isExpression
                 ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
                 : '',
-            domain: subplotDomains[i],
             type: 'category',
             tickangle: -45,
             showticklabels: isExpression,
@@ -1364,7 +1358,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             selectedMetrics,
             xLabelCount: xDisplayLabels.length,
             subplotCount: subplots.length,
-            domains: subplotDomains,
+            weights,
             traceCount: traces.length
         });
         console.groupEnd();
