@@ -1205,7 +1205,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         subplotTitles: subplots.map(s => s.title)
     });
 
-    const heatmapHeight = Math.max(320, 120 + (geneLabels.length * 14));
+    const heatmapHeight = Math.max(400, 265 + (geneLabels.length * 14));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
     const weights = subplots.map(slot => {
         if(slot.kind === "expr") return 1;
