@@ -720,9 +720,9 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         layout.annotations.push({
             text: panel.title,
             x: 0.5,
-            y: 1.03,
+            y: 1.06,
             xref: index === 0 ? 'x domain' : `x${index + 1} domain`,
-            yref: 'paper',
+            yref: index === 0 ? 'y domain' : `y${index + 1} domain`,
             showarrow: false,
             font: {size: 16}
         });
@@ -1338,9 +1338,9 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         layout.annotations.push({
             text: `<b>${slot.title}</b>`,
             x: 0.5,
-            y: 1.035,
+            y: 1.06,
             xref: `${xKey} domain`,
-            yref: 'paper',
+            yref: `${yKey} domain`,
             showarrow: false,
             font: {size: 13}
         });
