@@ -8,7 +8,7 @@ let RHO_CORRELATION_DATA = new Map()
 const SPATIAL_DATASETS = {
     RNA: "rna_zscore_long.csv",
     PROTEIN: "prot_zscore_long.csv",
-    RHO: "Rho-correlation.txt"
+    RHO: "correlation_eachprot_RNAnew.txt"
 }
 
 function cleanQuotedValue(value){
