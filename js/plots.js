@@ -445,14 +445,14 @@ function plotTemporal(){
     if(rnaTraces.length > 0 && protTraces.length > 0){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
         layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis = {title: 'Normalized Count', automargin: true};
+        layout.yaxis = {title: 'Log2 Normalized Counts', automargin: true};
         layout.xaxis2 = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
         layout.yaxis2 = {title: 'LFQ', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
         protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
     } else if(rnaTraces.length > 0){
         layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis = {title: 'Normalized Count', automargin: true};
+        layout.yaxis = {title: 'Log2 Normalized Counts', automargin: true};
         rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     } else if(protTraces.length > 0){
         layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
