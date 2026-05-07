@@ -99,9 +99,9 @@ RHO_CORRELATION_DATA = parseRhoCorrelationText(rhoText)
 
 // Load spatiotemporal data from TSV and add
 const rnaFiles = [
-    {url: "Table-S5_Biocycle-results_RNAseq_a-PSM.tsv", region: "Anterior"},
-    {url: "Table-S6_Biocycle-results_RNAseq_p-PSM.tsv", region: "Posterior"},
-    {url: "Table-S7_Biocycle-results_RNAseq_Somite.tsv", region: "Somite"}
+    {url: "A_log2_tranformed_cleaned.tsv", region: "a-psm"},
+    {url: "P_log2_tranformed_cleaned.tsv", region: "p-psm"},
+    {url: "S_log2_tranformed_cleaned.tsv", region: "Somite"}
 ]
 
 for (const file of rnaFiles) {
@@ -145,9 +145,9 @@ for (const file of rnaFiles) {
 
 // Protein files
 const protFiles = [
-    {url: "Table-S2_Biocycle-results_Protein_a-PSM.tsv", region: "Anterior"},
-    {url: "Table-S3_Biocycle-results_Protein_p-PSM.tsv", region: "Posterior"},
-    {url: "Table-S4_Biocycle-results_Protein_Somite.tsv", region: "Somite"}
+    {url: "spatialtemporal_depA_norm_cleaned.tsv", region: "a-psm"},
+    {url: "spatialtemporal_depP_norm_cleaned.tsv", region: "p-psm"},
+    {url: "spatialtemporal_depS_norm_cleaned.tsv", region: "Somite"}
 ]
 
 for (const file of protFiles) {
