@@ -414,6 +414,14 @@ Spatiotemporal Filters
 <option value="0.1">&le; 0.1</option>
 </select>
 
+<label for="explorerTemporalSignificanceDataset">Significant in:</label>
+<select id="explorerTemporalSignificanceDataset">
+<option value="either" selected>Either RNA or Protein</option>
+<option value="both">Both RNA and Protein</option>
+<option value="rna_only">RNA only</option>
+<option value="prot_only">Protein only</option>
+</select>
+
 <div class="explorer-preview-controls">
 <label class="metric-option"><input type="checkbox" id="explorerTemporalTopNEnabled" checked> Use top-N preview</label>
 <label for="explorerTemporalTopN">N:</label>

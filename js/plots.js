@@ -1128,14 +1128,20 @@ function getTemporalExplorerSelection(){
         return pair.rnaRows.length > 0 || pair.protRows.length > 0;
     });
 
+    const sigDataset = document.getElementById("explorerTemporalSignificanceDataset")?.value || "either";
+
     const filteredGenes = baseGenes.filter(geneLower => {
         const pair = geneRowsByGene.get(geneLower);
         const rnaRows = pair.rnaRows;
         const protRows = pair.protRows;
 
         if(threshold === null || Number.isNaN(threshold)) return true;
-        return hasMetricBelowThreshold(rnaRows, pValueMetric, threshold)
-            || hasMetricBelowThreshold(protRows, pValueMetric, threshold);
+        const rnaSig = hasMetricBelowThreshold(rnaRows, pValueMetric, threshold);
+        const protSig = hasMetricBelowThreshold(protRows, pValueMetric, threshold);
+        if(sigDataset === "both")     return rnaSig && protSig;
+        if(sigDataset === "rna_only") return rnaSig && !protSig;
+        if(sigDataset === "prot_only") return !rnaSig && protSig;
+        return rnaSig || protSig; // "either"
     });
 
     const rankedGenes = sortTemporalGenesByMode(filteredGenes, topNSortMode, geneRowsByGene, pValueMetric);

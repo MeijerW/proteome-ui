@@ -165,7 +165,8 @@ function setupExplorerPreviewBindings(){
     'explorerSpatialTopNSort',
     'explorerTemporalTopNEnabled',
     'explorerTemporalTopN',
-    'explorerTemporalTopNSort'
+    'explorerTemporalTopNSort',
+    'explorerTemporalSignificanceDataset'
   ];
 
   const triggerUpdate = () => {
