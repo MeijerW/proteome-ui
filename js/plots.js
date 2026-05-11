@@ -1,29 +1,4 @@
 const VIEW_PLOT_STATE = {};
-const ENABLE_TEMPORAL_HEATMAP_HEADER_STRIPS = true;
-
-const TEMPORAL_TIMEPOINT_COLORS = {
-    "30": "#ffc963",
-    "60": "#ffa45e",
-    "90": "#ff775c",
-    "120": "#ff5789"
-};
-
-const TEMPORAL_REGION_COLORS = {
-    RNA: {
-        "p-psm": "#D4AF37",
-        "a-psm": "#F9D777",
-        "somite": "#F9E8B8",
-        "posterior": "#D4AF37",
-        "anterior": "#F9D777"
-    },
-    Protein: {
-        "p-psm": "#8281BE",
-        "a-psm": "#B2B2D9",
-        "somite": "#D7D6EC",
-        "posterior": "#8281BE",
-        "anterior": "#B2B2D9"
-    }
-};
 let CURRENT_PLOT_METADATA = {
     modality: "plot",
     view: "general",
@@ -124,111 +99,6 @@ function parseGeneInput(input){
         .map(token => token.toLowerCase());
 
     return Array.from(new Set(tokens));
-}
-
-function extractTimepointLabelFromColumnLabel(label){
-    const raw = String(label || "").trim();
-    if(!raw) return "";
-
-    const tpMatch = /TP_(\d+)/i.exec(raw);
-    if(tpMatch) return String(tpMatch[1]);
-
-    const numberMatch = raw.match(/\d+/);
-    return numberMatch ? String(numberMatch[0]) : raw;
-}
-
-function buildTimepointSegments(xDisplayLabels){
-    const labels = Array.isArray(xDisplayLabels) ? xDisplayLabels : [];
-    if(labels.length === 0) return [];
-
-    const segments = [];
-    labels.forEach((label, idx) => {
-        const tp = extractTimepointLabelFromColumnLabel(label);
-        const previous = segments[segments.length - 1];
-        if(previous && previous.label === tp){
-            previous.end = idx;
-            return;
-        }
-        segments.push({label: tp, start: idx, end: idx});
-    });
-    return segments;
-}
-
-function addTemporalHeaderStrips(layout, {xKey, dataset, xDisplayLabels, region}){
-    const labels = Array.isArray(xDisplayLabels) ? xDisplayLabels : [];
-    if(labels.length === 0) return;
-
-    if(!Array.isArray(layout.shapes)) layout.shapes = [];
-    if(!Array.isArray(layout.annotations)) layout.annotations = [];
-
-    const segmentCount = labels.length;
-    const segments = buildTimepointSegments(labels);
-    const regionKey = String(region || "").trim().toLowerCase();
-    const regionColors = TEMPORAL_REGION_COLORS[dataset] || {};
-    const regionColor = regionColors[regionKey] || (dataset === "RNA" ? "#D4AF37" : "#8281BE");
-    const normalizedRegionLabel = String(region || "").trim();
-
-    // Timepoint strip
-    segments.forEach(seg => {
-        const x0 = seg.start / segmentCount;
-        const x1 = (seg.end + 1) / segmentCount;
-        const fill = TEMPORAL_TIMEPOINT_COLORS[seg.label] || "#d7d7d7";
-        layout.shapes.push({
-            type: "rect",
-            xref: `${xKey} domain`,
-            yref: "paper",
-            x0,
-            x1,
-            y0: 1.02,
-            y1: 1.08,
-            line: {width: 0},
-            fillcolor: fill,
-            layer: "above"
-        });
-        layout.annotations.push({
-            xref: `${xKey} domain`,
-            yref: "paper",
-            x: (x0 + x1) / 2,
-            y: 1.05,
-            text: `<b>${seg.label}</b>`,
-            showarrow: false,
-            font: {size: 9, color: "#111"}
-        });
-    });
-
-    // Region strip
-    layout.shapes.push({
-        type: "rect",
-        xref: `${xKey} domain`,
-        yref: "paper",
-        x0: 0,
-        x1: 1,
-        y0: 1.09,
-        y1: 1.14,
-        line: {width: 0},
-        fillcolor: regionColor,
-        layer: "above"
-    });
-
-    // Labels above strips
-    layout.annotations.push({
-        xref: `${xKey} domain`,
-        yref: "paper",
-        x: 0.5,
-        y: 1.115,
-        text: `<b>${normalizedRegionLabel}</b>`,
-        showarrow: false,
-        font: {size: 10, color: "#111"}
-    });
-    layout.annotations.push({
-        xref: `${xKey} domain`,
-        yref: "paper",
-        x: 0.5,
-        y: 1.165,
-        text: `<b>${dataset}</b>`,
-        showarrow: false,
-        font: {size: 11, color: "#111"}
-    });
 }
 
 function hasRenderedPlot(){
@@ -2054,14 +1924,13 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     });
     const subplotCount = Math.max(1, subplots.length);
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-    const showHeaderStrips = ENABLE_TEMPORAL_HEATMAP_HEADER_STRIPS;
 
     const customPlotTitle = optionsOverride?.plotTitle;
 
     const layout = {
         title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
-        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: showHeaderStrips ? 190 : 120, b: 145},
+        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 120, b: 145},
         grid: {
             rows: 1,
             columns: subplotCount,
@@ -2109,10 +1978,12 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         const isExpression = slot.kind === "expr";
 
         layout[layoutXKey] = {
-            title: '',
+            title: isExpression
+                ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
+                : '',
             type: 'category',
             tickangle: -45,
-            showticklabels: isExpression && !showHeaderStrips,
+            showticklabels: isExpression,
             ticks: '',
             ticklen: 0
         };
@@ -2179,26 +2050,15 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             });
         }
 
-        if(isExpression && showHeaderStrips){
-            addTemporalHeaderStrips(layout, {
-                xKey,
-                dataset: slot.dataset,
-                xDisplayLabels,
-                region
-            });
-        }
-
-        if(!(isExpression && showHeaderStrips)){
-            layout.annotations.push({
-                text: `<b>${slot.title}</b>`,
-                x: 0.5,
-                y: 1.06,
-                xref: `${xKey} domain`,
-                yref: `${yKey} domain`,
-                showarrow: false,
-                font: {size: 13}
-            });
-        }
+        layout.annotations.push({
+            text: `<b>${slot.title}</b>`,
+            x: 0.5,
+            y: 1.06,
+            xref: `${xKey} domain`,
+            yref: `${yKey} domain`,
+            showarrow: false,
+            font: {size: 13}
+        });
     });
 
     try {
