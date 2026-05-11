@@ -71,15 +71,27 @@ display:block;
 }
 
 #plot{
-padding:40px;
-max-width: 1200px;
-margin: 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+    padding: 24px 0 0;
 }
 
 #plotLayout{
     display:flex;
     align-items:flex-start;
     gap:20px;
+    width: min(100%, 1800px);
+    margin: 0 auto;
+    padding: 0 24px 24px;
+    box-sizing: border-box;
+}
+
+#plot .js-plotly-plot,
+#plot .plot-container,
+#plot .svg-container{
+    width: 100% !important;
 }
 
 .stats-panel{
@@ -215,6 +227,7 @@ margin: 0 auto;
 @media (max-width: 1100px) {
     #plotLayout{
         flex-direction:column;
+        padding: 0 16px 20px;
     }
     .stats-panel{
         margin-top:0;

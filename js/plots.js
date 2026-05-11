@@ -1,7 +1,103 @@
 const VIEW_PLOT_STATE = {};
+let CURRENT_PLOT_METADATA = {
+    modality: "plot",
+    view: "general",
+    source: "manual",
+    region: "",
+    goId: "",
+    goName: ""
+};
+
+function cleanFilenamePart(value){
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[\\/:*?"<>|#%&{}$!'@+=`~^.,;()\[\]]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+}
+
+function setCurrentPlotMetadata(metadata = {}){
+    CURRENT_PLOT_METADATA = {
+        ...CURRENT_PLOT_METADATA,
+        ...metadata
+    };
+}
+
+function buildPlotDownloadFilename(){
+    const parts = ["proteomeui"];
+    const modality = cleanFilenamePart(CURRENT_PLOT_METADATA.modality || "plot");
+    const view = cleanFilenamePart(CURRENT_PLOT_METADATA.view || "general");
+    const source = cleanFilenamePart(CURRENT_PLOT_METADATA.source || "manual");
+    const region = cleanFilenamePart(CURRENT_PLOT_METADATA.region || "");
+    const goId = cleanFilenamePart(CURRENT_PLOT_METADATA.goId || "");
+    const goName = cleanFilenamePart(CURRENT_PLOT_METADATA.goName || "");
+
+    if(modality) parts.push(modality);
+    if(view) parts.push(view);
+    if(source && source !== "manual") parts.push(source);
+    if(region) parts.push(region);
+    if(goId) parts.push(goId);
+    if(goName) parts.push(goName);
+
+    return parts.join("_");
+}
+
+function buildResponsiveLayout(layout){
+    const next = {...layout};
+    delete next.width;
+    next.autosize = true;
+
+    const minHeight = 520;
+    const maxHeight = 980;
+    const viewportHeight = window.innerHeight || 900;
+    const targetHeight = Math.round(viewportHeight * 0.72);
+    const requestedHeight = Number.isFinite(next.height) ? next.height : 0;
+    next.height = Math.max(requestedHeight, Math.max(minHeight, Math.min(maxHeight, targetHeight)));
+
+    return next;
+}
+
+function plotWithResponsiveSizing(targetId, data, layout, config = {}){
+    const responsiveLayout = buildResponsiveLayout(layout);
+    const filename = buildPlotDownloadFilename();
+    const responsiveConfig = {
+        responsive: true,
+        toImageButtonOptions: {
+            filename,
+            format: "png",
+            scale: 2
+        },
+        ...config
+    };
+    responsiveConfig.toImageButtonOptions = {
+        filename,
+        format: "png",
+        scale: 2,
+        ...(config.toImageButtonOptions || {})
+    };
+    return Plotly.newPlot(targetId, data, responsiveLayout, responsiveConfig);
+}
 
 function clonePlotState(value){
     return JSON.parse(JSON.stringify(value));
+}
+
+function parseGeneInput(input){
+    const raw = Array.isArray(input) ? input.join("\n") : String(input || "");
+    const normalized = raw
+        .replace(/\\[tnr]/g, " ")
+        .replace(/\r\n?|\n/g, "\n");
+
+    const tokens = normalized
+        .split(/[\s,;]+/)
+        .map(token => token.trim())
+        .map(token => token.replace(/^["']+|["']+$/g, ""))
+        .filter(token => token.length > 0)
+        .map(token => token.toLowerCase());
+
+    return Array.from(new Set(tokens));
 }
 
 function hasRenderedPlot(){
@@ -27,6 +123,7 @@ function savePlotStateForView(viewKey){
         data: clonePlotState(plotEl.data),
         layout: clonePlotState(plotEl.layout || {}),
         config: clonePlotState(plotEl.config || {}),
+        metadata: clonePlotState(CURRENT_PLOT_METADATA || {}),
         statsHtml: statsPanel ? statsPanel.innerHTML : "",
         statsActive: statsPanel ? statsPanel.classList.contains("active") : false
     };
@@ -43,7 +140,10 @@ function restorePlotStateForView(viewKey){
     if(!viewKey || !VIEW_PLOT_STATE[viewKey]) return;
 
     const state = VIEW_PLOT_STATE[viewKey];
-    Plotly.newPlot("plot", clonePlotState(state.data), clonePlotState(state.layout), clonePlotState(state.config));
+    if(state.metadata){
+        setCurrentPlotMetadata(state.metadata);
+    }
+    plotWithResponsiveSizing("plot", clonePlotState(state.data), clonePlotState(state.layout), clonePlotState(state.config));
 
     const statsPanel = document.getElementById("temporalStatsPanel");
     if(statsPanel){
@@ -122,6 +222,14 @@ function plotSpatial(){
 
     const traces = [];
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
+    setCurrentPlotMetadata({
+        modality: "spatial",
+        view: "single-gene",
+        source: "manual",
+        region: "all-regions",
+        goId: "",
+        goName: ""
+    });
     const rhoValue = getSpatialCorrelationValue(displayGene);
     const rhoBand = getSpatialCorrelationBand(rhoValue);
     const spatialDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
@@ -132,7 +240,6 @@ function plotSpatial(){
         showlegend: true,
         template: "simple_white",
         height: 600,
-        width: 960,
         margin: {l: 80, r: 220, t: 90, b: 80},
         annotations: [buildSpatialCorrelationGuideAnnotation()]
     };
@@ -176,7 +283,7 @@ function plotSpatial(){
         layout.yaxis = {title: 'Z-score'};
     }
 
-    Plotly.newPlot("plot", traces, layout);
+    plotWithResponsiveSizing("plot", traces, layout);
     saveCurrentViewPlot();
 }
 
@@ -339,6 +446,14 @@ function plotTemporal(){
 
     const gene = document.getElementById("temporalGene").value.trim().toLowerCase();
     const region = document.getElementById("region").value;
+    setCurrentPlotMetadata({
+        modality: "spatiotemporal",
+        view: "single-gene",
+        source: "manual",
+        region,
+        goId: "",
+        goName: ""
+    });
 
     clearTemporalStatsPanel();
 
@@ -437,7 +552,6 @@ function plotTemporal(){
         title: `Spatiotemporal Expression - ${displayGene} (${region})${temporalDatasetSuffix}`,
         template: "simple_white",
         height: 600,
-        width: 800,
         showlegend: true,
         legend: { orientation: 'h', y: 1.1 }
     };
@@ -460,7 +574,7 @@ function plotTemporal(){
         protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     }
 
-    Plotly.newPlot("plot", traces, layout);
+    plotWithResponsiveSizing("plot", traces, layout);
     renderTemporalStatsPanel(gene, region, rnaGene, protGene);
     saveCurrentViewPlot();
 }
@@ -473,16 +587,28 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     clearTemporalStatsPanel();
 
-    const genesText = overrideGenes ? overrideGenes.join(',') : document.getElementById("spatialGenes").value.trim();
-    if(!genesText){
+    const genesInput = Array.isArray(overrideGenes)
+        ? overrideGenes
+        : document.getElementById("spatialGenes").value;
+    const genes = parseGeneInput(genesInput);
+
+    if(genes.length === 0){
         alert("Enter genes");
         return;
     }
 
-    const genes = genesText.split(',').map(g => g.trim().toLowerCase()).filter(g => g);
     const groups = ['Posterior', 'Anterior', 'Somite'];
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("spatialGeneMembership");
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("spatialAggregation");
+    const plotContext = optionsOverride?.plotContext || {};
+    setCurrentPlotMetadata({
+        modality: "spatial",
+        view: "heatmap",
+        source: plotContext.source || "manual",
+        region: plotContext.region || "all-regions",
+        goId: plotContext.goId || "",
+        goName: plotContext.goName || ""
+    });
 
     const toZScore = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
     const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
@@ -656,9 +782,6 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const layout = {
         title: customPlotTitle || "Spatial Expression Heatmap",
         height: heatmapHeight,
-        width: aggregationMode === "samples"
-            ? Math.max(hasRhoPanel ? 1260 : 1000, 260 + (xLabels.length * 85) + (hasRhoPanel ? 180 : 0))
-            : (hasRhoPanel ? 1180 : 1000),
         margin: {l: 220, r: hasRhoPanel ? 120 : 40, t: 90, b: 120},
         coloraxis: {
             colorscale: "Viridis",
@@ -734,7 +857,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         };
     });
 
-    Plotly.newPlot("plot", data, layout);
+    plotWithResponsiveSizing("plot", data, layout);
     saveCurrentViewPlot();
 }
 
@@ -1072,6 +1195,9 @@ function plotExplorerSpatialHeatmap(){
     plotSpatialHeatmap(genesToPlot, {
         membershipMode,
         aggregationMode,
+        plotContext: {
+            source: "explorer"
+        },
         plotTitle: `Spatial Explorer Heatmap - ${rhoLabel}, ${deLabel}`
     });
     const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
@@ -1238,6 +1364,10 @@ function plotExplorerTemporalHeatmap(){
         membershipMode,
         aggregationMode,
         selectedMetrics,
+        plotContext: {
+            source: "explorer",
+            region
+        },
         plotTitle: `Spatiotemporal Explorer Heatmap - ${region} (${thresholdLabel})`
     });
     const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
@@ -1270,6 +1400,16 @@ const GO_TERM_GENES_CACHE = {};
 function getGoIdFromInput(inputValue){
     const match = inputValue && inputValue.match(/(GO:\d{7})/i);
     return match ? match[1].toUpperCase() : null;
+}
+
+function getGoTermInfoFromInput(inputValue){
+    const raw = String(inputValue || "").trim();
+    const goId = getGoIdFromInput(raw) || "";
+    if(!goId) return {goId: "", goName: ""};
+
+    const pipeIndex = raw.indexOf("|");
+    const goName = pipeIndex >= 0 ? raw.slice(pipeIndex + 1).trim() : "";
+    return {goId, goName};
 }
 
 async function fetchGoTermSuggestions(query, limit = 20){
@@ -1453,7 +1593,8 @@ function inspectGoGenesForDataset(goId, genes){
 }
 
 async function plotGoSpatialHeatmap(){
-    const goId = getGoIdFromInput(document.getElementById('goTermInput').value);
+    const goInfo = getGoTermInfoFromInput(document.getElementById('goTermInput').value);
+    const goId = goInfo.goId;
     if(!goId){
         alert('Please enter or select a valid GO term ID (e.g. GO:0007049).');
         return;
@@ -1478,6 +1619,12 @@ async function plotGoSpatialHeatmap(){
         const goOptions = {
             membershipMode: getHeatmapGeneMembership("goSpatialGeneMembership"),
             aggregationMode: getAggregationMode("goSpatialAggregation"),
+            plotContext: {
+                source: "go",
+                region: "all-regions",
+                goId,
+                goName: goInfo.goName
+            },
             plotTitle: `GO Term Spatial Heatmap - ${goId}`
         };
         statusEl.textContent = `Plotting ${matched.length} dataset-matched genes for GO term ${goId}...`;
@@ -1491,7 +1638,8 @@ async function plotGoSpatialHeatmap(){
 }
 
 async function plotGoTemporalHeatmap(){
-    const goId = getGoIdFromInput(document.getElementById('goTermInputTemporal').value);
+    const goInfo = getGoTermInfoFromInput(document.getElementById('goTermInputTemporal').value);
+    const goId = goInfo.goId;
     if(!goId){
         alert('Please enter or select a valid GO term ID (e.g. GO:0007049).');
         return;
@@ -1526,6 +1674,12 @@ async function plotGoTemporalHeatmap(){
             aggregationMode: getAggregationMode("goTemporalAggregation"),
             selectedMetrics: getSelectedTemporalMetrics(".go-temporal-metric-checkbox"),
             pValueFilterMode: (document.getElementById("goTemporalPValueFilter")?.value || "all"),
+            plotContext: {
+                source: "go",
+                region,
+                goId,
+                goName: goInfo.goName
+            },
             plotTitle: `GO Term Spatiotemporal Heatmap - ${goId}`
         };
         renderTemporalHeatmapFromGenes(matched, region, goOptions);
@@ -1548,9 +1702,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
 
     clearTemporalStatsPanel();
 
-    const genes = Array.isArray(inputGenes)
-        ? Array.from(new Set(inputGenes.map(g => String(g).trim().toLowerCase()).filter(g => g)))
-        : [];
+    const genes = parseGeneInput(inputGenes);
     if(genes.length === 0){
         alert("Enter genes");
         return;
@@ -1560,6 +1712,15 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("temporalGeneMembership");
     const selectedMetrics = optionsOverride?.selectedMetrics || getSelectedTemporalMetrics();
     const pValueFilterMode = optionsOverride?.pValueFilterMode || (document.getElementById("temporalPValueFilter")?.value || "all");
+    const plotContext = optionsOverride?.plotContext || {};
+    setCurrentPlotMetadata({
+        modality: "spatiotemporal",
+        view: "heatmap",
+        source: plotContext.source || "manual",
+        region,
+        goId: plotContext.goId || "",
+        goName: plotContext.goName || ""
+    });
     const applyPValueFilter = selectedMetrics.includes("P_VALUE") && pValueFilterMode === "significant";
     const times = [30, 60, 90, 120];
 
@@ -1768,7 +1929,6 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     const layout = {
         title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
         height: heatmapHeight,
-        width: Math.max(900, 340 + (weights.reduce((sum, w) => sum + (w * 260), 0))),
         margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 120, b: 145},
         grid: {
             rows: 1,
@@ -1901,7 +2061,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     });
 
     try {
-        Plotly.newPlot("plot", traces, layout);
+        plotWithResponsiveSizing("plot", traces, layout);
     } catch (err) {
         console.error("Temporal heatmap rendering failed", err, {
             region,
@@ -1927,7 +2087,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
 function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = null){
     const genes = Array.isArray(overrideGenes)
         ? overrideGenes
-        : document.getElementById("temporalGenes").value.trim().split(',');
+        : document.getElementById("temporalGenes").value;
     const region = regionOverride || document.getElementById("heatmapRegion").value;
     return renderTemporalHeatmapFromGenes(genes, region, optionsOverride);
 }
