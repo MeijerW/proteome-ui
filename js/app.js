@@ -44,6 +44,10 @@ button.classList.add("active")
 
 restoreCurrentViewPlot()
 
+if(typeof window.updateExplorerPreviews === 'function'){
+window.updateExplorerPreviews();
+}
+
 }
 
 function openSubTab(id, button){
@@ -71,6 +75,10 @@ currentMainTab
 button.classList.add("active")
 
 restoreCurrentViewPlot()
+
+if(typeof window.updateExplorerPreviews === 'function'){
+window.updateExplorerPreviews();
+}
 
 }
 

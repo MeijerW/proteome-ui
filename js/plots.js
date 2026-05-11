@@ -821,7 +821,7 @@ function buildExplorerAdvice({risk, aggregationMode, membershipMode, hasPValueFi
 function getTopNPreviewConfig(enabledId, nId){
     const enabled = !!document.getElementById(enabledId)?.checked;
     const nRaw = Number(document.getElementById(nId)?.value);
-    const n = Number.isFinite(nRaw) && nRaw > 0 ? Math.floor(nRaw) : 50;
+    const n = Number.isFinite(nRaw) && nRaw > 0 ? Math.floor(nRaw) : 10;
     return {enabled, n};
 }
 
@@ -903,21 +903,56 @@ function getSpatialExplorerSelection(){
     const deStatus = document.getElementById("explorerSpatialDeStatus")?.value || "all";
     const membershipMode = document.getElementById("explorerSpatialMembership")?.value || "all";
     const aggregationMode = document.getElementById("explorerSpatialAggregation")?.value || "average";
-    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_abs_desc";
+    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_abs_asc";
 
-    const isSpatialRow = (row) => !row.time;
-    const rnaGenes = getGenesFromRows(RNA_DATA, isSpatialRow);
-    const protGenes = getGenesFromRows(PROT_DATA, isSpatialRow);
-    const baseGenes = membershipMode === "both"
-        ? intersectSets(rnaGenes, protGenes)
-        : new Set([...rnaGenes, ...protGenes]);
+    const groups = ["Posterior", "Anterior", "Somite"];
+    const byGene = new Map();
+    const ensureGeneEntry = (geneLower) => {
+        if(!byGene.has(geneLower)){
+            byGene.set(geneLower, {
+                hasRna: false,
+                hasProt: false,
+                rnaCountByGroup: {Posterior: 0, Anterior: 0, Somite: 0},
+                protCountByGroup: {Posterior: 0, Anterior: 0, Somite: 0}
+            });
+        }
+        return byGene.get(geneLower);
+    };
+
+    RNA_DATA.forEach(row => {
+        if(!row || row.time || !row.ID) return;
+        const geneLower = String(row.ID).toLowerCase();
+        const entry = ensureGeneEntry(geneLower);
+        entry.hasRna = true;
+        const group = row.group;
+        if(group && Object.prototype.hasOwnProperty.call(entry.rnaCountByGroup, group)){
+            entry.rnaCountByGroup[group] += 1;
+        }
+    });
+
+    PROT_DATA.forEach(row => {
+        if(!row || row.time || !row.ID) return;
+        const geneLower = String(row.ID).toLowerCase();
+        const entry = ensureGeneEntry(geneLower);
+        entry.hasProt = true;
+        const group = row.group;
+        if(group && Object.prototype.hasOwnProperty.call(entry.protCountByGroup, group)){
+            entry.protCountByGroup[group] += 1;
+        }
+    });
+
+    const baseGenes = Array.from(byGene.keys()).filter(geneLower => {
+        const entry = byGene.get(geneLower);
+        if(membershipMode === "both") return entry.hasRna && entry.hasProt;
+        return entry.hasRna || entry.hasProt;
+    });
 
     const differentialSet = getDifferentialGeneSet();
     const deListRequiredButMissing = (deStatus === "de" || deStatus === "nonde") && differentialSet.size === 0;
 
     const filteredGenes = deListRequiredButMissing
         ? []
-        : Array.from(baseGenes)
+        : baseGenes
             .filter(geneLower => {
                 const rhoValue = getSpatialCorrelationValue(geneLower);
                 return passesRhoBandFilter(rhoValue, rhoBand)
@@ -926,13 +961,14 @@ function getSpatialExplorerSelection(){
 
     const rankedGenes = sortSpatialGenesByMode(filteredGenes, topNSortMode);
 
-    const groups = ["Posterior", "Anterior", "Somite"];
     const replicateEstimate = aggregationMode === "samples"
         ? groups.reduce((sum, group) => {
             let maxCount = 1;
             filteredGenes.forEach(geneLower => {
-                const rnaCount = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && !d.time && d.group === group).length;
-                const protCount = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && !d.time && d.group === group).length;
+                const entry = byGene.get(geneLower);
+                if(!entry) return;
+                const rnaCount = entry.rnaCountByGroup[group] || 0;
+                const protCount = entry.protCountByGroup[group] || 0;
                 maxCount = Math.max(maxCount, rnaCount, protCount);
             });
             return sum + maxCount;
@@ -1063,18 +1099,39 @@ function getTemporalExplorerSelection(){
     const thresholdRaw = document.getElementById("explorerTemporalPValueThreshold")?.value || "all";
     const threshold = thresholdRaw === "all" ? null : Number(thresholdRaw);
 
-    const regionMatch = (row) => row.time >= 0 && row.region && String(row.region).toLowerCase() === region.toLowerCase();
-    const rnaGenes = getGenesFromRows(RNA_DATA, regionMatch);
-    const protGenes = getGenesFromRows(PROT_DATA, regionMatch);
-    const baseGenes = membershipMode === "both"
-        ? intersectSets(rnaGenes, protGenes)
-        : new Set([...rnaGenes, ...protGenes]);
+    const regionLower = String(region).toLowerCase();
+    const regionMatch = (row) => row.time >= 0 && row.region && String(row.region).toLowerCase() === regionLower;
 
     const geneRowsByGene = new Map();
-    const filteredGenes = Array.from(baseGenes).filter(geneLower => {
-        const rnaRows = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && regionMatch(d));
-        const protRows = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && regionMatch(d));
-        geneRowsByGene.set(geneLower, {rnaRows, protRows});
+    const ensureGeneRowsEntry = (geneLower) => {
+        if(!geneRowsByGene.has(geneLower)){
+            geneRowsByGene.set(geneLower, {rnaRows: [], protRows: []});
+        }
+        return geneRowsByGene.get(geneLower);
+    };
+
+    RNA_DATA.forEach(row => {
+        if(!row || !row.ID || !regionMatch(row)) return;
+        const geneLower = String(row.ID).toLowerCase();
+        ensureGeneRowsEntry(geneLower).rnaRows.push(row);
+    });
+
+    PROT_DATA.forEach(row => {
+        if(!row || !row.ID || !regionMatch(row)) return;
+        const geneLower = String(row.ID).toLowerCase();
+        ensureGeneRowsEntry(geneLower).protRows.push(row);
+    });
+
+    const baseGenes = Array.from(geneRowsByGene.keys()).filter(geneLower => {
+        const pair = geneRowsByGene.get(geneLower);
+        if(membershipMode === "both") return pair.rnaRows.length > 0 && pair.protRows.length > 0;
+        return pair.rnaRows.length > 0 || pair.protRows.length > 0;
+    });
+
+    const filteredGenes = baseGenes.filter(geneLower => {
+        const pair = geneRowsByGene.get(geneLower);
+        const rnaRows = pair.rnaRows;
+        const protRows = pair.protRows;
 
         if(threshold === null || Number.isNaN(threshold)) return true;
         return hasMetricBelowThreshold(rnaRows, pValueMetric, threshold)
@@ -1088,8 +1145,8 @@ function getTemporalExplorerSelection(){
         ? Math.max(
             4,
             new Set([
-                ...RNA_DATA.filter(regionMatch).map(d => d.sample).filter(Boolean),
-                ...PROT_DATA.filter(regionMatch).map(d => d.sample).filter(Boolean)
+                ...Array.from(geneRowsByGene.values()).flatMap(pair => pair.rnaRows.map(d => d.sample).filter(Boolean)),
+                ...Array.from(geneRowsByGene.values()).flatMap(pair => pair.protRows.map(d => d.sample).filter(Boolean))
             ]).size
         )
         : 4;
@@ -1185,8 +1242,20 @@ function plotExplorerTemporalHeatmap(){
 }
 
 function updateExplorerPreviews(){
+    const activeMain = document.querySelector(".main-tab-content.active")?.id;
+    if(activeMain !== "explorer") return;
+
+    const activeSub = document.querySelector("#explorer .subtab-content.active")?.id;
+    if(activeSub === "explorerSpatial"){
+        updateSpatialExplorerPreview();
+        return;
+    }
+    if(activeSub === "explorerTemporal"){
+        updateTemporalExplorerPreview();
+        return;
+    }
+
     updateSpatialExplorerPreview();
-    updateTemporalExplorerPreview();
 }
 
 // GO term helpers
