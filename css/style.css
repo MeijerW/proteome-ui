@@ -82,7 +82,7 @@ display:block;
     display:flex;
     align-items:flex-start;
     gap:20px;
-    width: min(100%, 1800px);
+    width: min(94vw, 1500px);
     margin: 0 auto;
     padding: 0 24px 24px;
     box-sizing: border-box;
