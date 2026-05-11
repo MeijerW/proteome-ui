@@ -738,6 +738,457 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     saveCurrentViewPlot();
 }
 
+function getGenesFromRows(rows, predicate = null){
+    const out = new Set();
+    rows.forEach(row => {
+        if(!row || !row.ID) return;
+        if(predicate && !predicate(row)) return;
+        out.add(String(row.ID).toLowerCase());
+    });
+    return out;
+}
+
+function intersectSets(a, b){
+    const out = new Set();
+    a.forEach(value => {
+        if(b.has(value)) out.add(value);
+    });
+    return out;
+}
+
+function getDifferentialGeneSet(){
+    if(typeof DIFFERENTIALLY_EXPRESSED_GENES !== "undefined" && DIFFERENTIALLY_EXPRESSED_GENES instanceof Set){
+        return DIFFERENTIALLY_EXPRESSED_GENES;
+    }
+    return new Set();
+}
+
+function passesRhoBandFilter(rhoValue, rhoBand){
+    if(rhoBand === "all") return true;
+    if(!Number.isFinite(rhoValue)) return false;
+    if(rhoBand === "neg") return rhoValue < -0.5;
+    if(rhoBand === "mid") return rhoValue >= -0.5 && rhoValue <= 0.5;
+    if(rhoBand === "pos") return rhoValue > 0.5;
+    return true;
+}
+
+function passesDeFilter(geneLower, deStatus, differentialSet){
+    if(deStatus === "all") return true;
+    const isDe = differentialSet.has(geneLower);
+    if(deStatus === "de") return isDe;
+    if(deStatus === "nonde") return !isDe;
+    return true;
+}
+
+function setExplorerStatus(statusId, message){
+    const statusEl = document.getElementById(statusId);
+    if(statusEl) statusEl.textContent = message;
+}
+
+function getExplorerRiskLabel(estimatedCells){
+    if(estimatedCells < 30000) return "low";
+    if(estimatedCells < 120000) return "medium";
+    return "high";
+}
+
+function setExplorerFeedback(estimateId, adviceId, payload){
+    const estimateEl = document.getElementById(estimateId);
+    const adviceEl = document.getElementById(adviceId);
+    if(estimateEl){
+        estimateEl.textContent = payload.estimateText || "";
+        estimateEl.className = `explorer-estimate risk-${payload.risk || "low"}`;
+    }
+    if(adviceEl){
+        adviceEl.textContent = payload.adviceText || "";
+    }
+}
+
+function buildExplorerAdvice({risk, aggregationMode, membershipMode, hasPValueFilter}){
+    const suggestions = [];
+    if(aggregationMode === "samples") suggestions.push("Switch to average mode to reduce columns.");
+    if(membershipMode !== "both") suggestions.push("Use 'both datasets only' to reduce gene count.");
+    if(!hasPValueFilter) suggestions.push("Apply a stricter p-value threshold (0.05) to reduce genes.");
+    if(risk === "high") suggestions.push("Try plotting one region at a time or narrowing rho/de filters first.");
+
+    if(suggestions.length === 0){
+        if(risk === "low") return "Current selection is lightweight for most browsers.";
+        if(risk === "medium") return "Selection should work, but plotting may take a few seconds.";
+        return "Large selection. Plotting may be slow on less powerful machines.";
+    }
+    return `Suggested actions: ${suggestions.join(" ")}`;
+}
+
+function getTopNPreviewConfig(enabledId, nId){
+    const enabled = !!document.getElementById(enabledId)?.checked;
+    const nRaw = Number(document.getElementById(nId)?.value);
+    const n = Number.isFinite(nRaw) && nRaw > 0 ? Math.floor(nRaw) : 50;
+    return {enabled, n};
+}
+
+function applyTopNPreview(genes, enabledId, nId){
+    const preview = getTopNPreviewConfig(enabledId, nId);
+    if(!preview.enabled) return {displayGenes: [...genes], previewEnabled: false, previewN: preview.n};
+    return {
+        displayGenes: genes.slice(0, preview.n),
+        previewEnabled: true,
+        previewN: preview.n
+    };
+}
+
+function sortSpatialGenesByMode(genes, mode){
+    const rows = genes.map(gene => ({
+        gene,
+        rho: getSpatialCorrelationValue(gene)
+    }));
+
+    const withNaNLast = (a, b, valueA, valueB, fallbackMode = "alpha") => {
+        const aNan = Number.isNaN(valueA);
+        const bNan = Number.isNaN(valueB);
+        if(aNan && bNan) return String(a.gene).localeCompare(String(b.gene));
+        if(aNan) return 1;
+        if(bNan) return -1;
+        if(valueA !== valueB) return valueA - valueB;
+        if(fallbackMode === "alpha") return String(a.gene).localeCompare(String(b.gene));
+        return 0;
+    };
+
+    rows.sort((a, b) => {
+        if(mode === "rho_abs_asc") return withNaNLast(a, b, Math.abs(a.rho), Math.abs(b.rho));
+        if(mode === "rho_abs_desc") return withNaNLast(a, b, -Math.abs(a.rho), -Math.abs(b.rho));
+        if(mode === "rho_asc") return withNaNLast(a, b, a.rho, b.rho);
+        if(mode === "rho_desc") return withNaNLast(a, b, -a.rho, -b.rho);
+        return String(a.gene).localeCompare(String(b.gene));
+    });
+
+    return rows.map(row => row.gene);
+}
+
+function getTemporalMetricScore(rnaRows, protRows, metricName, mode = "metric_asc"){
+    const values = [];
+    rnaRows.forEach(row => {
+        const v = Number(row[metricName]);
+        if(!Number.isNaN(v)) values.push(v);
+    });
+    protRows.forEach(row => {
+        const v = Number(row[metricName]);
+        if(!Number.isNaN(v)) values.push(v);
+    });
+
+    if(values.length === 0) return Number.POSITIVE_INFINITY;
+    if(mode === "metric_desc") return -Math.max(...values);
+    return Math.min(...values);
+}
+
+function sortTemporalGenesByMode(genes, mode, geneRowsByGene, metricName){
+    if(mode === "alpha") return [...genes].sort((a, b) => String(a).localeCompare(String(b)));
+
+    const rows = genes.map(gene => {
+        const pair = geneRowsByGene.get(gene) || {rnaRows: [], protRows: []};
+        return {
+            gene,
+            score: getTemporalMetricScore(pair.rnaRows, pair.protRows, metricName, mode)
+        };
+    });
+
+    rows.sort((a, b) => {
+        if(a.score !== b.score) return a.score - b.score;
+        return String(a.gene).localeCompare(String(b.gene));
+    });
+
+    return rows.map(row => row.gene);
+}
+
+function getSpatialExplorerSelection(){
+    const rhoBand = document.getElementById("explorerSpatialRhoBand")?.value || "all";
+    const deStatus = document.getElementById("explorerSpatialDeStatus")?.value || "all";
+    const membershipMode = document.getElementById("explorerSpatialMembership")?.value || "all";
+    const aggregationMode = document.getElementById("explorerSpatialAggregation")?.value || "average";
+    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_abs_desc";
+
+    const isSpatialRow = (row) => !row.time;
+    const rnaGenes = getGenesFromRows(RNA_DATA, isSpatialRow);
+    const protGenes = getGenesFromRows(PROT_DATA, isSpatialRow);
+    const baseGenes = membershipMode === "both"
+        ? intersectSets(rnaGenes, protGenes)
+        : new Set([...rnaGenes, ...protGenes]);
+
+    const differentialSet = getDifferentialGeneSet();
+    const deListRequiredButMissing = (deStatus === "de" || deStatus === "nonde") && differentialSet.size === 0;
+
+    const filteredGenes = deListRequiredButMissing
+        ? []
+        : Array.from(baseGenes)
+            .filter(geneLower => {
+                const rhoValue = getSpatialCorrelationValue(geneLower);
+                return passesRhoBandFilter(rhoValue, rhoBand)
+                    && passesDeFilter(geneLower, deStatus, differentialSet);
+            });
+
+    const rankedGenes = sortSpatialGenesByMode(filteredGenes, topNSortMode);
+
+    const groups = ["Posterior", "Anterior", "Somite"];
+    const replicateEstimate = aggregationMode === "samples"
+        ? groups.reduce((sum, group) => {
+            let maxCount = 1;
+            filteredGenes.forEach(geneLower => {
+                const rnaCount = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && !d.time && d.group === group).length;
+                const protCount = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && !d.time && d.group === group).length;
+                maxCount = Math.max(maxCount, rnaCount, protCount);
+            });
+            return sum + maxCount;
+        }, 0)
+        : groups.length;
+
+    const estimatedColumns = (replicateEstimate * 2) + 1;
+    const estimatedCells = filteredGenes.length * estimatedColumns;
+    const risk = getExplorerRiskLabel(estimatedCells);
+
+    return {
+        rhoBand,
+        deStatus,
+        membershipMode,
+        aggregationMode,
+        filteredGenes,
+        rankedGenes,
+        topNSortMode,
+        deListRequiredButMissing,
+        estimatedColumns,
+        estimatedCells,
+        risk
+    };
+}
+
+function updateSpatialExplorerPreview(){
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        setExplorerFeedback("explorerSpatialEstimate", "explorerSpatialAdvice", {
+            estimateText: "Loading data...",
+            adviceText: "Preview will update as soon as data is available.",
+            risk: "low"
+        });
+        return;
+    }
+
+    const selection = getSpatialExplorerSelection();
+    const preview = applyTopNPreview(selection.rankedGenes, "explorerSpatialTopNEnabled", "explorerSpatialTopN");
+    const displayCells = preview.displayGenes.length * selection.estimatedColumns;
+    const displayRisk = getExplorerRiskLabel(displayCells);
+    if(selection.deListRequiredButMissing){
+        setExplorerFeedback("explorerSpatialEstimate", "explorerSpatialAdvice", {
+            estimateText: "DE list required but not loaded.",
+            adviceText: "Switch DE filter to 'All genes' or verify heatmap_order_20260326.txt is available.",
+            risk: "high"
+        });
+        return;
+    }
+
+    setExplorerFeedback("explorerSpatialEstimate", "explorerSpatialAdvice", {
+        estimateText: preview.previewEnabled
+            ? `Selection preview: ${selection.filteredGenes.length} matched genes. Plot will show top ${preview.displayGenes.length} genes (~${displayCells.toLocaleString()} cells, ${displayRisk} load), sorted by ${selection.topNSortMode}.`
+            : `Selection preview: ${selection.filteredGenes.length} genes, ~${selection.estimatedColumns} columns, ~${selection.estimatedCells.toLocaleString()} heatmap cells (${selection.risk} load).`,
+        adviceText: buildExplorerAdvice({
+            risk: preview.previewEnabled ? displayRisk : selection.risk,
+            aggregationMode: selection.aggregationMode,
+            membershipMode: selection.membershipMode,
+            hasPValueFilter: true
+        }),
+        risk: preview.previewEnabled ? displayRisk : selection.risk
+    });
+}
+
+function plotExplorerSpatialHeatmap(){
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        setExplorerStatus("explorerSpatialStatus", "Data is still loading. Please wait and try again.");
+        return;
+    }
+
+    const selection = getSpatialExplorerSelection();
+    const { rhoBand, deStatus, membershipMode, aggregationMode, filteredGenes, rankedGenes, deListRequiredButMissing } = selection;
+
+    if(deListRequiredButMissing){
+        alert("Differential-expression gene list was not loaded. Check the DE list filename in data loading configuration.");
+        setExplorerStatus("explorerSpatialStatus", "DE list not loaded. Verify heatmap_order_20260326.txt is accessible.");
+        return;
+    }
+
+    if(filteredGenes.length === 0){
+        alert("No genes matched the selected spatial filters.");
+        setExplorerStatus("explorerSpatialStatus", "0 genes matched the selected filters.");
+        return;
+    }
+
+    const preview = applyTopNPreview(rankedGenes, "explorerSpatialTopNEnabled", "explorerSpatialTopN");
+    const genesToPlot = preview.displayGenes;
+    if(genesToPlot.length === 0){
+        setExplorerStatus("explorerSpatialStatus", "Preview returned no genes. Increase N or disable top-N preview.");
+        return;
+    }
+
+    const rhoLabel = rhoBand === "all"
+        ? "all rho"
+        : rhoBand === "neg" ? "rho < -0.5"
+        : rhoBand === "mid" ? "-0.5 <= rho <= 0.5"
+        : "rho > 0.5";
+    const deLabel = deStatus === "all"
+        ? "all genes"
+        : deStatus === "de" ? "DE only" : "non-DE only";
+
+    plotSpatialHeatmap(genesToPlot, {
+        membershipMode,
+        aggregationMode,
+        plotTitle: `Spatial Explorer Heatmap - ${rhoLabel}, ${deLabel}`
+    });
+    const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
+    const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
+        ? ` Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes.`
+        : ` Plotted ${genesToPlot.length} genes.`;
+    setExplorerStatus("explorerSpatialStatus", `${previewNote}${heavyNote}`.trim());
+}
+
+function hasMetricBelowThreshold(rows, metricName, threshold){
+    if(!Array.isArray(rows) || rows.length === 0) return false;
+    return rows.some(row => {
+        const value = Number(row[metricName]);
+        return !Number.isNaN(value) && value <= threshold;
+    });
+}
+
+function getTemporalExplorerSelection(){
+    const region = document.getElementById("explorerTemporalRegion")?.value || "p-psm";
+    const membershipMode = document.getElementById("explorerTemporalMembership")?.value || "all";
+    const aggregationMode = document.getElementById("explorerTemporalAggregation")?.value || "average";
+    const selectedMetrics = getSelectedTemporalMetrics(".explorer-temporal-metric-checkbox");
+    const pValueMetric = document.getElementById("explorerTemporalPValueMetric")?.value || "P_VALUE";
+    const topNSortMode = document.getElementById("explorerTemporalTopNSort")?.value || "metric_asc";
+    const thresholdRaw = document.getElementById("explorerTemporalPValueThreshold")?.value || "all";
+    const threshold = thresholdRaw === "all" ? null : Number(thresholdRaw);
+
+    const regionMatch = (row) => row.time >= 0 && row.region && String(row.region).toLowerCase() === region.toLowerCase();
+    const rnaGenes = getGenesFromRows(RNA_DATA, regionMatch);
+    const protGenes = getGenesFromRows(PROT_DATA, regionMatch);
+    const baseGenes = membershipMode === "both"
+        ? intersectSets(rnaGenes, protGenes)
+        : new Set([...rnaGenes, ...protGenes]);
+
+    const geneRowsByGene = new Map();
+    const filteredGenes = Array.from(baseGenes).filter(geneLower => {
+        const rnaRows = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && regionMatch(d));
+        const protRows = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === geneLower && regionMatch(d));
+        geneRowsByGene.set(geneLower, {rnaRows, protRows});
+
+        if(threshold === null || Number.isNaN(threshold)) return true;
+        return hasMetricBelowThreshold(rnaRows, pValueMetric, threshold)
+            || hasMetricBelowThreshold(protRows, pValueMetric, threshold);
+    });
+
+    const rankedGenes = sortTemporalGenesByMode(filteredGenes, topNSortMode, geneRowsByGene, pValueMetric);
+
+    const datasetCount = membershipMode === "both" ? 2 : 2;
+    const exprColumnCount = aggregationMode === "samples"
+        ? Math.max(
+            4,
+            new Set([
+                ...RNA_DATA.filter(regionMatch).map(d => d.sample).filter(Boolean),
+                ...PROT_DATA.filter(regionMatch).map(d => d.sample).filter(Boolean)
+            ]).size
+        )
+        : 4;
+    const metricColumnCount = selectedMetrics.length;
+    const estimatedColumns = (exprColumnCount + metricColumnCount) * datasetCount;
+    const estimatedCells = filteredGenes.length * estimatedColumns;
+    const risk = getExplorerRiskLabel(estimatedCells);
+
+    return {
+        region,
+        membershipMode,
+        aggregationMode,
+        selectedMetrics,
+        pValueMetric,
+        threshold,
+        filteredGenes,
+        rankedGenes,
+        topNSortMode,
+        estimatedColumns,
+        estimatedCells,
+        risk
+    };
+}
+
+function updateTemporalExplorerPreview(){
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        setExplorerFeedback("explorerTemporalEstimate", "explorerTemporalAdvice", {
+            estimateText: "Loading data...",
+            adviceText: "Preview will update as soon as data is available.",
+            risk: "low"
+        });
+        return;
+    }
+
+    const selection = getTemporalExplorerSelection();
+    const preview = applyTopNPreview(selection.rankedGenes, "explorerTemporalTopNEnabled", "explorerTemporalTopN");
+    const displayCells = preview.displayGenes.length * selection.estimatedColumns;
+    const displayRisk = getExplorerRiskLabel(displayCells);
+    const thresholdText = selection.threshold === null
+        ? "no threshold"
+        : `${selection.pValueMetric} <= ${selection.threshold}`;
+
+    setExplorerFeedback("explorerTemporalEstimate", "explorerTemporalAdvice", {
+        estimateText: preview.previewEnabled
+            ? `Selection preview: ${selection.filteredGenes.length} matched genes for ${selection.region} (${thresholdText}). Plot will show top ${preview.displayGenes.length} genes (~${displayCells.toLocaleString()} cells, ${displayRisk} load), sorted by ${selection.topNSortMode}.`
+            : `Selection preview: ${selection.filteredGenes.length} genes, ~${selection.estimatedColumns} columns, ~${selection.estimatedCells.toLocaleString()} heatmap cells (${selection.risk} load) for ${selection.region} (${thresholdText}).`,
+        adviceText: buildExplorerAdvice({
+            risk: preview.previewEnabled ? displayRisk : selection.risk,
+            aggregationMode: selection.aggregationMode,
+            membershipMode: selection.membershipMode,
+            hasPValueFilter: selection.threshold !== null
+        }),
+        risk: preview.previewEnabled ? displayRisk : selection.risk
+    });
+}
+
+function plotExplorerTemporalHeatmap(){
+    if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
+        alert("Data is still loading. Please wait a moment and try again.");
+        setExplorerStatus("explorerTemporalStatus", "Data is still loading. Please wait and try again.");
+        return;
+    }
+
+    const selection = getTemporalExplorerSelection();
+    const { region, membershipMode, aggregationMode, selectedMetrics, pValueMetric, threshold, filteredGenes, rankedGenes } = selection;
+
+    if(filteredGenes.length === 0){
+        const thresholdText = threshold === null ? "" : ` with ${pValueMetric} <= ${threshold}`;
+        alert(`No genes matched the selected spatiotemporal filters${thresholdText}.`);
+        setExplorerStatus("explorerTemporalStatus", `0 genes matched the selected filters${thresholdText}.`);
+        return;
+    }
+
+    const preview = applyTopNPreview(rankedGenes, "explorerTemporalTopNEnabled", "explorerTemporalTopN");
+    const genesToPlot = preview.displayGenes;
+    if(genesToPlot.length === 0){
+        setExplorerStatus("explorerTemporalStatus", "Preview returned no genes. Increase N or disable top-N preview.");
+        return;
+    }
+
+    const thresholdLabel = threshold === null ? "no p-value filter" : `${pValueMetric} <= ${threshold}`;
+    renderTemporalHeatmapFromGenes(genesToPlot, region, {
+        membershipMode,
+        aggregationMode,
+        selectedMetrics,
+        plotTitle: `Spatiotemporal Explorer Heatmap - ${region} (${thresholdLabel})`
+    });
+    const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
+    const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
+        ? `Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes for ${region} (${thresholdLabel}).`
+        : `Plotted ${genesToPlot.length} genes for ${region} (${thresholdLabel}).`;
+    setExplorerStatus("explorerTemporalStatus", `${previewNote} ${heavyNote}`.trim());
+}
+
+function updateExplorerPreviews(){
+    updateSpatialExplorerPreview();
+    updateTemporalExplorerPreview();
+}
+
 // GO term helpers
 const GO_TERM_GENES_CACHE = {};
 
@@ -1384,8 +1835,11 @@ window.plotGoSpatialHeatmap = plotGoSpatialHeatmap;
 window.plotGoTemporalHeatmap = plotGoTemporalHeatmap;
 window.plotSpatial = plotSpatial;
 window.plotSpatialHeatmap = plotSpatialHeatmap;
+window.plotExplorerSpatialHeatmap = plotExplorerSpatialHeatmap;
 window.plotTemporal = plotTemporal;
 window.plotTemporalHeatmap = plotTemporalHeatmap;
+window.plotExplorerTemporalHeatmap = plotExplorerTemporalHeatmap;
+window.updateExplorerPreviews = updateExplorerPreviews;
 window.fetchGoTermSuggestions = fetchGoTermSuggestions;
 window.populateGoTermsDatalist = populateGoTermsDatalist;
 window.clearExplorerPlot = clearExplorerPlot;

@@ -141,8 +141,48 @@ function setupTemporalSineFitAutoReplot(){
   });
 }
 
+function setupExplorerPreviewBindings(){
+  const controls = [
+    'explorerSpatialRhoBand',
+    'explorerSpatialDeStatus',
+    'explorerSpatialMembership',
+    'explorerSpatialAggregation',
+    'explorerTemporalRegion',
+    'explorerTemporalMembership',
+    'explorerTemporalAggregation',
+    'explorerTemporalPValueMetric',
+    'explorerTemporalPValueThreshold',
+    'explorerSpatialTopNEnabled',
+    'explorerSpatialTopN',
+    'explorerSpatialTopNSort',
+    'explorerTemporalTopNEnabled',
+    'explorerTemporalTopN',
+    'explorerTemporalTopNSort'
+  ];
+
+  const triggerUpdate = () => {
+    if(typeof window.updateExplorerPreviews === 'function'){
+      window.updateExplorerPreviews();
+    }
+  };
+
+  controls.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', triggerUpdate);
+    if(el && el.tagName === 'INPUT') el.addEventListener('input', triggerUpdate);
+  });
+
+  document.querySelectorAll('.explorer-temporal-metric-checkbox').forEach(cb => {
+    cb.addEventListener('change', triggerUpdate);
+  });
+
+  document.addEventListener('proteomeDataLoaded', triggerUpdate);
+  triggerUpdate();
+}
+
 setupKeyboardShortcuts();
 setupPValueFilterControls();
 setupTemporalSineFitAutoReplot();
+setupExplorerPreviewBindings();
 
 window.getCurrentViewKey = getCurrentViewKey;

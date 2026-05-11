@@ -4,11 +4,13 @@ const BASE =
 let RNA_DATA = []
 let PROT_DATA = []
 let RHO_CORRELATION_DATA = new Map()
+let DIFFERENTIALLY_EXPRESSED_GENES = new Set()
 
 const SPATIAL_DATASETS = {
     RNA: "rna_zscore_long.csv",
     PROTEIN: "prot_zscore_long.csv",
-    RHO: "correlation_eachprot_RNAnew.txt"
+    RHO: "correlation_eachprot_RNAnew.txt",
+    DE_LIST: "heatmap_order_20260326.txt"
 }
 
 function cleanQuotedValue(value){
@@ -36,6 +38,19 @@ function parseRhoCorrelationText(text){
     });
 
     return rhoMap;
+}
+
+function parseDifferentialGeneList(text){
+    const genes = new Set();
+    String(text || "")
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line)
+        .forEach(line => {
+            const gene = cleanQuotedValue(line);
+            if(gene) genes.add(gene.toLowerCase());
+        });
+    return genes;
 }
 
 function getSpatialExpressionValue(row){
@@ -96,6 +111,13 @@ throw new Error(`Failed to load ${SPATIAL_DATASETS.RHO}: HTTP ${rhoFile.status}`
 }
 const rhoText = await rhoFile.text()
 RHO_CORRELATION_DATA = parseRhoCorrelationText(rhoText)
+
+const deFile = await fetch(BASE + SPATIAL_DATASETS.DE_LIST)
+if(!deFile.ok){
+throw new Error(`Failed to load ${SPATIAL_DATASETS.DE_LIST}: HTTP ${deFile.status}`)
+}
+const deText = await deFile.text()
+DIFFERENTIALLY_EXPRESSED_GENES = parseDifferentialGeneList(deText)
 
 // Load spatiotemporal data from TSV and add
 const rnaFiles = [
@@ -188,6 +210,8 @@ for (const file of protFiles) {
         });
     });
 }
+
+document.dispatchEvent(new CustomEvent("proteomeDataLoaded"))
 
 }
 

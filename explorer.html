@@ -35,6 +35,10 @@ Spatiotemporal Viewer
 GO Term Browser
 </button>
 
+<button class="tab-button" onclick="openMainTab('explorer', this)">
+Data Explorer
+</button>
+
 </div>
 
 <!-- SPATIAL TAB -->
@@ -288,6 +292,144 @@ GO Spatiotemporal Heatmap
 
 <button id="goTemporalGenerateBtn" onclick="plotGoTemporalHeatmap()">Generate GO heatmap (Spatiotemporal)</button>
 <p id="goGeneCountTemporal" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
+
+</div>
+
+</div>
+
+
+<!-- DATA EXPLORER TAB -->
+<div id="explorer" class="main-tab-content">
+
+<div class="sub-tabs">
+
+<button class="subtab-button active" onclick="openSubTab('explorerSpatial', this)">
+Spatial Filters
+</button>
+
+<button class="subtab-button" onclick="openSubTab('explorerTemporal', this)">
+Spatiotemporal Filters
+</button>
+
+</div>
+
+
+<div id="explorerSpatial" class="subtab-content active">
+
+<h3>Spatial Data Explorer</h3>
+
+<label for="explorerSpatialRhoBand">Rho filter:</label>
+<select id="explorerSpatialRhoBand">
+<option value="all" selected>All rho values</option>
+<option value="neg">rho &lt; -0.5</option>
+<option value="mid">-0.5 to 0.5</option>
+<option value="pos">rho &gt; 0.5</option>
+</select>
+
+<label for="explorerSpatialDeStatus">Differential expression:</label>
+<select id="explorerSpatialDeStatus">
+<option value="all" selected>All genes</option>
+<option value="de">Differentially expressed only</option>
+<option value="nonde">Not differentially expressed only</option>
+</select>
+
+<label for="explorerSpatialMembership">Gene set:</label>
+<select id="explorerSpatialMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="explorerSpatialAggregation">Display mode:</label>
+<select id="explorerSpatialAggregation">
+<option value="average" selected>Average per region</option>
+<option value="samples">Individual samples (if available)</option>
+</select>
+
+<div class="explorer-preview-controls">
+<label class="metric-option"><input type="checkbox" id="explorerSpatialTopNEnabled" checked> Use top-N preview</label>
+<label for="explorerSpatialTopN">N:</label>
+<input id="explorerSpatialTopN" type="number" min="1" step="1" value="50">
+<label for="explorerSpatialTopNSort">Sort:</label>
+<select id="explorerSpatialTopNSort">
+<option value="rho_abs_desc" selected>Highest |rho| first</option>
+<option value="rho_abs_asc">Lowest |rho| first</option>
+<option value="rho_desc">Highest rho first</option>
+<option value="rho_asc">Lowest rho first</option>
+<option value="alpha">Alphabetical</option>
+</select>
+</div>
+
+<button id="explorerSpatialPlotBtn" onclick="plotExplorerSpatialHeatmap()">Plot Data</button>
+<p id="explorerSpatialEstimate" class="explorer-estimate"></p>
+<p id="explorerSpatialAdvice" class="explorer-advice"></p>
+<p id="explorerSpatialStatus" style="margin-top: 0.5rem; font-size: 0.9rem; color: #333;"></p>
+
+</div>
+
+
+<div id="explorerTemporal" class="subtab-content">
+
+<h3>Spatiotemporal Data Explorer</h3>
+
+<p class="region-prompt">Which region would you like to look at?</p>
+<select id="explorerTemporalRegion">
+<option>p-psm</option>
+<option>a-psm</option>
+<option>Somite</option>
+</select>
+
+<label for="explorerTemporalMembership">Gene set:</label>
+<select id="explorerTemporalMembership">
+<option value="all" selected>Show all genes</option>
+<option value="both">Show only genes present in both RNA and Protein</option>
+</select>
+
+<label for="explorerTemporalAggregation">Display mode:</label>
+<select id="explorerTemporalAggregation">
+<option value="average" selected>Average per timepoint</option>
+<option value="samples">Individual samples (replicates)</option>
+</select>
+
+<div class="meta-controls">
+<span>Add metadata columns:</span>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="P_VALUE" checked> P_VALUE</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="Q_VALUE"> Q_VALUE</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="PERIOD"> PERIOD</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="LAG"> LAG</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="AMPLITUDE"> AMPLITUDE</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="OFFSET"> OFFSET</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="MEAN_PERIODICITY"> MEAN_PERIODICITY</label>
+<label class="metric-option"><input type="checkbox" class="explorer-temporal-metric-checkbox" value="SCATTER"> SCATTER</label>
+</div>
+
+<label for="explorerTemporalPValueMetric">Significance metric:</label>
+<select id="explorerTemporalPValueMetric">
+<option value="P_VALUE" selected>P_VALUE</option>
+<option value="Q_VALUE">Q_VALUE</option>
+</select>
+
+<label for="explorerTemporalPValueThreshold">Significance threshold:</label>
+<select id="explorerTemporalPValueThreshold">
+<option value="0.05" selected>&le; 0.05</option>
+<option value="0.1">&le; 0.1</option>
+</select>
+
+<div class="explorer-preview-controls">
+<label class="metric-option"><input type="checkbox" id="explorerTemporalTopNEnabled" checked> Use top-N preview</label>
+<label for="explorerTemporalTopN">N:</label>
+<input id="explorerTemporalTopN" type="number" min="1" step="1" value="50">
+<label for="explorerTemporalTopNSort">Sort:</label>
+<select id="explorerTemporalTopNSort">
+<option value="metric_asc" selected>Strongest significance first (lowest selected metric)</option>
+<option value="metric_desc">Weakest significance first (highest selected metric)</option>
+<option value="alpha">Alphabetical</option>
+</select>
+</div>
+
+<button id="explorerTemporalPlotBtn" onclick="plotExplorerTemporalHeatmap()">Plot Data</button>
+<p id="explorerTemporalEstimate" class="explorer-estimate"></p>
+<p id="explorerTemporalAdvice" class="explorer-advice"></p>
+<p id="explorerTemporalStatus" style="margin-top: 0.5rem; font-size: 0.9rem; color: #333;"></p>
 
 </div>
 
