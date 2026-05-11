@@ -1700,6 +1700,29 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         return { zmin: undefined, zmax: undefined, zauto: true, colorbarTitle: metric };
     };
 
+    const normalizeZValue = (value, zmin, zmax) => {
+        if(Number.isNaN(value)) return NaN;
+        if(!Number.isFinite(zmin) || !Number.isFinite(zmax) || zmax <= zmin) return NaN;
+        const normalized = (value - zmin) / (zmax - zmin);
+        return Math.max(0, Math.min(1, normalized));
+    };
+
+    const getMetricCellTextColor = (metric, zValue, scaleConfig) => {
+        const norm = normalizeZValue(zValue, scaleConfig.zmin, scaleConfig.zmax);
+        if(Number.isNaN(norm)) return "#111";
+
+        if(metric === "P_VALUE" || metric === "Q_VALUE"){
+            return norm <= 0.36 ? "#f8f9ff" : "#111";
+        }
+        if(metric === "LAG"){
+            return norm <= 0.24 ? "#f8f9ff" : "#111";
+        }
+        if(metric === "PERIOD"){
+            return (norm <= 0.22 || norm >= 0.75) ? "#f8f9ff" : "#111";
+        }
+        return (norm <= 0.16 || norm >= 0.84) ? "#f8f9ff" : "#111";
+    };
+
     const buildMetricColumn = (datasetKey, metric) => entries.map(e => {
         const rows = datasetKey === "RNA" ? e.rnaGene : e.protGene;
         const ref = rows[0] || {};
@@ -1835,7 +1858,12 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
             const metricZValues = getMetricZValues(slot.metric, metricValues);
             const scaleConfig = getMetricScaleConfig(slot.metric);
-            const metricText = metricValues.map(v => formatMetricCell(v));
+            const metricText = metricValues.map((v, rowIndex) => {
+                const rawText = formatMetricCell(v);
+                if(!rawText) return "";
+                const textColor = getMetricCellTextColor(slot.metric, metricZValues[rowIndex], scaleConfig);
+                return `<span style=\"color:${textColor};font-weight:600\">${rawText}</span>`;
+            });
             const showColorbar = !shownMetricColorbars.has(slot.metric);
             shownMetricColorbars.add(slot.metric);
             traces.push({
@@ -1851,7 +1879,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
                 zauto: scaleConfig.zauto,
                 text: metricText.map(v => [v]),
                 texttemplate: "%{text}",
-                textfont: {size: 10, color: "#111"},
+                textfont: {size: 10},
                 customdata: metricValues.map(v => [v]),
                 hovertemplate: slot.metric === "PERIOD"
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
