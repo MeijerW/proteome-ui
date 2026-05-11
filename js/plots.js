@@ -44,24 +44,35 @@ function buildPlotDownloadFilename(){
     return parts.join("_");
 }
 
-function buildResponsiveLayout(layout){
+function buildResponsiveLayout(layout, options = {}){
     const next = {...layout};
+    const {heightMode = "adaptive"} = options;
     delete next.width;
     next.autosize = true;
 
-    const viewportHeight = window.innerHeight || 900;
-    const minHeight = Math.max(380, Math.round(viewportHeight * 0.45));
-    const maxHeight = Math.round(viewportHeight * 0.86);
-    const requestedHeight = Number.isFinite(next.height)
-        ? next.height
-        : Math.round(viewportHeight * 0.72);
-    next.height = Math.max(minHeight, Math.min(maxHeight, requestedHeight));
+    if(heightMode === "single-gene"){
+        const viewportHeight = window.innerHeight || 900;
+        const minHeight = Math.max(380, Math.round(viewportHeight * 0.45));
+        const maxHeight = Math.round(viewportHeight * 0.86);
+        const requestedHeight = Number.isFinite(next.height)
+            ? next.height
+            : Math.round(viewportHeight * 0.72);
+        next.height = Math.max(minHeight, Math.min(maxHeight, requestedHeight));
+        return next;
+    }
+
+    // Keep heatmap sizing as provided by caller; only fill in when absent.
+    if(!Number.isFinite(next.height)){
+        const viewportHeight = window.innerHeight || 900;
+        next.height = Math.round(viewportHeight * 0.72);
+    }
 
     return next;
 }
 
 function plotWithResponsiveSizing(targetId, data, layout, config = {}){
-    const responsiveLayout = buildResponsiveLayout(layout);
+    const {heightMode = "adaptive", ...plotlyConfigInput} = config;
+    const responsiveLayout = buildResponsiveLayout(layout, {heightMode});
     const filename = buildPlotDownloadFilename();
     const responsiveConfig = {
         responsive: true,
@@ -70,13 +81,13 @@ function plotWithResponsiveSizing(targetId, data, layout, config = {}){
             format: "png",
             scale: 2
         },
-        ...config
+        ...plotlyConfigInput
     };
     responsiveConfig.toImageButtonOptions = {
         filename,
         format: "png",
         scale: 2,
-        ...(config.toImageButtonOptions || {})
+        ...(plotlyConfigInput.toImageButtonOptions || {})
     };
     return Plotly.newPlot(targetId, data, responsiveLayout, responsiveConfig);
 }
@@ -284,7 +295,7 @@ function plotSpatial(){
         layout.yaxis = {title: 'Z-score'};
     }
 
-    plotWithResponsiveSizing("plot", traces, layout);
+    plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
     saveCurrentViewPlot();
 }
 
@@ -575,7 +586,7 @@ function plotTemporal(){
         protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
     }
 
-    plotWithResponsiveSizing("plot", traces, layout);
+    plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
     renderTemporalStatsPanel(gene, region, rnaGene, protGene);
     saveCurrentViewPlot();
 }
