@@ -119,20 +119,11 @@ Heatmap
 
 <input id="temporalGene" list="genes-temporal">
 
-<p class="region-prompt">Which region would you like to look at?</p>
 <div class="temporal-single-controls">
-<select id="region">
-
-<option>p-psm</option>
-<option>a-psm</option>
-<option>Somite</option>
-
-</select>
-
 <label class="metric-option">
 <input type="checkbox" id="temporalShowSineFit">
 Overlay BioCycle sine fit
-<span class="metric-help" tabindex="0" data-tooltip="Uses the selected gene and region BioCycle parameters (PERIOD, LAG, AMPLITUDE, OFFSET) from RNA and/or Protein rows. The overlay is computed as y = AMPLITUDE * cos(2*pi*(t - LAG)/PERIOD) + OFFSET over 0 to 150 minutes and drawn on top of the observed data.">?</span>
+<span class="metric-help" tabindex="0" data-tooltip="Uses the selected gene BioCycle parameters (PERIOD, LAG, AMPLITUDE, OFFSET) from RNA and/or Protein rows in each region panel. The overlay is computed as y = AMPLITUDE * cos(2*pi*(t - LAG)/PERIOD) + OFFSET over 0 to 150 minutes and drawn on top of the observed data.">?</span>
 </label>
 
 <button onclick="plotTemporal()">Plot</button>
@@ -445,7 +436,10 @@ Spatiotemporal Filters
 
 
 <div id="plotLayout">
+<div id="plotColumn">
+<div id="plotHeaderStrip" class="plot-header-strip" aria-hidden="true"></div>
 <div id="plot"></div>
+</div>
 <div id="temporalStatsPanel" class="stats-panel"></div>
 </div>
 

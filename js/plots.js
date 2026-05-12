@@ -19,10 +19,30 @@ function cleanFilenamePart(value){
 }
 
 function setCurrentPlotMetadata(metadata = {}){
-    CURRENT_PLOT_METADATA = {
+    const nextMetadata = {
         ...CURRENT_PLOT_METADATA,
         ...metadata
     };
+
+    if(!Object.prototype.hasOwnProperty.call(metadata, 'headerStrip') || !metadata.headerStrip){
+        delete nextMetadata.headerStrip;
+    }
+    if(!Object.prototype.hasOwnProperty.call(metadata, 'plotViewportMode') || !metadata.plotViewportMode){
+        delete nextMetadata.plotViewportMode;
+    }
+
+    CURRENT_PLOT_METADATA = nextMetadata;
+}
+
+function applyPlotViewportMode(metadata = CURRENT_PLOT_METADATA){
+    const plotLayout = document.getElementById('plotLayout');
+    if(!plotLayout) return;
+
+    plotLayout.classList.remove('plot-layout--spatial-single');
+
+    if(metadata?.plotViewportMode === 'spatial-single'){
+        plotLayout.classList.add('plot-layout--spatial-single');
+    }
 }
 
 function buildPlotDownloadFilename(){
@@ -89,7 +109,11 @@ function plotWithResponsiveSizing(targetId, data, layout, config = {}){
         scale: 2,
         ...(plotlyConfigInput.toImageButtonOptions || {})
     };
-    return Plotly.newPlot(targetId, data, responsiveLayout, responsiveConfig);
+    return Plotly.newPlot(targetId, data, responsiveLayout, responsiveConfig).then(result => {
+        renderPlotHeaderStrip(CURRENT_PLOT_METADATA);
+        applyPlotViewportMode(CURRENT_PLOT_METADATA);
+        return result;
+    });
 }
 
 function clonePlotState(value){
@@ -123,6 +147,8 @@ function clearExplorerPlot(){
         Plotly.purge(plotEl);
         plotEl.innerHTML = "";
     }
+    clearPlotHeaderStrip();
+    applyPlotViewportMode({});
     clearTemporalStatsPanel();
 }
 
@@ -214,6 +240,142 @@ const SPATIAL_RHO_COLORSCALE = [
     [1.0, '#ffffbf']
 ];
 
+const TEMPORAL_TIMEPOINT_HEADER_COLORS = ['#ffc963', '#ffa45e', '#ff775c', '#ff5789'];
+const TEMPORAL_REGION_COLORS_RNA = {
+    'p-PSM': '#D4AF37',
+    'a-PSM': '#F9D777',
+    'Somite': '#F9E8B8',
+    Posterior: '#D4AF37',
+    Anterior: '#F9D777'
+};
+const TEMPORAL_REGION_COLORS_PROTEIN = {
+    'p-PSM': '#8281BE',
+    'a-PSM': '#B2B2D9',
+    'Somite': '#D7D6EC',
+    Posterior: '#8281BE',
+    Anterior: '#B2B2D9'
+};
+
+function normalizeTemporalRegionKey(region){
+    const key = String(region || '').trim().toLowerCase();
+    if(key === 'p-psm' || key === 'posterior') return 'p-PSM';
+    if(key === 'a-psm' || key === 'anterior') return 'a-PSM';
+    if(key === 'somite') return 'Somite';
+    return String(region || '').trim();
+}
+
+function getTemporalRegionHeaderColor(dataset, region){
+    const normalized = normalizeTemporalRegionKey(region);
+    if(dataset === 'RNA'){
+        return TEMPORAL_REGION_COLORS_RNA[normalized] || TEMPORAL_REGION_COLORS_RNA.Somite;
+    }
+    return TEMPORAL_REGION_COLORS_PROTEIN[normalized] || TEMPORAL_REGION_COLORS_PROTEIN.Somite;
+}
+
+function getPlotHeaderStripElement(){
+    return document.getElementById('plotHeaderStrip');
+}
+
+function clearPlotHeaderStrip(){
+    const strip = getPlotHeaderStripElement();
+    if(!strip) return;
+
+    strip.innerHTML = '';
+    strip.className = 'plot-header-strip';
+    strip.hidden = true;
+    strip.removeAttribute('data-modality');
+    strip.removeAttribute('data-view');
+    strip.removeAttribute('data-source');
+    strip.removeAttribute('data-region');
+    strip.removeAttribute('data-mode');
+    strip.removeAttribute('data-title');
+}
+
+function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
+    const strip = getPlotHeaderStripElement();
+    if(!strip){
+        return;
+    }
+
+    const headerStrip = metadata?.headerStrip;
+    const shouldShow = headerStrip
+        && headerStrip.kind === 'temporal-expression'
+        && headerStrip.aggregationMode !== 'samples'
+        && Array.isArray(headerStrip.columns)
+        && headerStrip.columns.some(column => column.kind === 'expr');
+
+    if(!shouldShow){
+        clearPlotHeaderStrip();
+        return;
+    }
+
+    const columns = headerStrip.columns;
+    const timepoints = Array.isArray(headerStrip.timepoints) ? headerStrip.timepoints : [];
+    const regionLabel = normalizeTemporalRegionKey(metadata?.region || headerStrip.region || '');
+    const leftMargin = Number(headerStrip.leftMargin) || 0;
+    const rightMargin = Number(headerStrip.rightMargin) || 0;
+    const headerTitle = String(headerStrip.title || '').trim();
+
+    strip.hidden = false;
+    strip.className = 'plot-header-strip plot-header-strip--temporal is-visible';
+    strip.dataset.modality = metadata?.modality || '';
+    strip.dataset.view = metadata?.view || '';
+    strip.dataset.source = metadata?.source || '';
+    strip.dataset.region = regionLabel;
+    strip.dataset.mode = headerStrip.aggregationMode || '';
+    strip.dataset.title = headerTitle;
+    strip.style.paddingLeft = `${leftMargin}px`;
+    strip.style.paddingRight = `${rightMargin}px`;
+    strip.style.gridTemplateColumns = columns.map(column => `${column.weight || 1}fr`).join(' ');
+
+    strip.replaceChildren();
+
+    if(headerTitle){
+        const title = document.createElement('div');
+        title.className = 'plot-header-strip__title';
+        title.textContent = headerTitle;
+        title.style.gridColumn = '1 / -1';
+        strip.appendChild(title);
+    }
+
+    columns.forEach(column => {
+        const cell = document.createElement('div');
+        cell.className = 'plot-header-strip__cell';
+
+        if(column.kind !== 'expr'){
+            cell.classList.add('plot-header-strip__cell--blank');
+            strip.appendChild(cell);
+            return;
+        }
+
+        const modalityLabel = document.createElement('div');
+        modalityLabel.className = 'plot-header-strip__modality-label';
+        modalityLabel.textContent = column.dataset || column.label || '';
+        cell.appendChild(modalityLabel);
+
+        const regionBar = document.createElement('div');
+        regionBar.className = 'plot-header-strip__region-bar';
+        regionBar.style.backgroundColor = getTemporalRegionHeaderColor(column.dataset || column.label, metadata?.region || headerStrip.region);
+        regionBar.textContent = regionLabel;
+        cell.appendChild(regionBar);
+
+        const timepointRow = document.createElement('div');
+        timepointRow.className = 'plot-header-strip__timepoint-row';
+        timepointRow.style.gridTemplateColumns = `repeat(${Math.max(1, timepoints.length)}, minmax(0, 1fr))`;
+
+        timepoints.forEach((timepoint, index) => {
+            const timepointCell = document.createElement('div');
+            timepointCell.className = 'plot-header-strip__timepoint';
+            timepointCell.style.backgroundColor = TEMPORAL_TIMEPOINT_HEADER_COLORS[index % TEMPORAL_TIMEPOINT_HEADER_COLORS.length];
+            timepointCell.textContent = String(timepoint);
+            timepointRow.appendChild(timepointCell);
+        });
+
+        cell.appendChild(timepointRow);
+        strip.appendChild(cell);
+    });
+}
+
 function plotSpatial(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -238,6 +400,7 @@ function plotSpatial(){
         modality: "spatial",
         view: "single-gene",
         source: "manual",
+        plotViewportMode: "spatial-single",
         region: "all-regions",
         goId: "",
         goName: ""
@@ -457,137 +620,218 @@ function plotTemporal(){
     }
 
     const gene = document.getElementById("temporalGene").value.trim().toLowerCase();
-    const region = document.getElementById("region").value;
     setCurrentPlotMetadata({
         modality: "spatiotemporal",
         view: "single-gene",
         source: "manual",
-        region,
+        region: "all-regions",
         goId: "",
         goName: ""
     });
 
     clearTemporalStatsPanel();
 
-    const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
-    const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0);
+    const regions = ["p-psm", "a-psm", "Somite"];
+    const regionPanels = regions.map(region => {
+        const regionLower = region.toLowerCase();
+        const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === regionLower && d.time >= 0);
+        const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && d.region && d.region.toLowerCase() === regionLower && d.time >= 0);
+        return {region, rnaGene, protGene};
+    });
 
-    if(rnaGene.length === 0 && protGene.length === 0){
-        alert("Gene not found in selected region");
+    const regionPanelsWithData = regionPanels.filter(panel => panel.rnaGene.length > 0 || panel.protGene.length > 0);
+
+    if(regionPanelsWithData.length === 0){
+        alert("Gene not found in any region");
         return;
     }
 
-    const rnaTraces = [];
-    const protTraces = [];
+    const traces = [];
     const times = [30, 60, 90, 120];
     const timeLabels = times.map(String);
     const showSineFit = !!document.getElementById("temporalShowSineFit")?.checked;
 
-    // RNA traces (box + points)
-    if(rnaGene.length > 0){
-        times.forEach((time, idx) => {
-            const yVals = rnaGene.filter(d => d.time === time).map(d => d.value);
-            if(yVals.length > 0){
-                rnaTraces.push({
-                    x: Array(yVals.length).fill(time),
-                    y: yVals,
-                    type: "box",
-                    name: "RNA",
-                    legendgroup: "RNA",
-                    showlegend: idx === 0,
-                    marker: {color: "#d5af34"},
-                    boxmean: true,
-                    boxpoints: false
-                });
-            }
-        });
-        // Stripplot points
-        rnaTraces.push({
-            x: rnaGene.map(d => Number(d.time)),
-            y: rnaGene.map(d => d.value),
-            mode: "markers",
-            type: "scatter",
-            name: "RNA points",
-            legendgroup: "RNA",
-            showlegend: false,
-            marker: {color: "#d5af34", size: 6, opacity: 0.8}
-        });
+    const firstPanel = regionPanelsWithData[0] || {};
+    const displayGene = (firstPanel.rnaGene?.[0]?.ID || firstPanel.protGene?.[0]?.ID || gene).toUpperCase();
 
-        if(showSineFit){
-            const rnaFit = buildBiocycleFitTrace(rnaGene, "RNA", "#8c6d1f");
-            if(rnaFit) rnaTraces.push(rnaFit);
-        }
-    }
+    const columns = regionPanels.length;
+    const rows = 2;
 
-    // Protein traces (box + points)
-    if(protGene.length > 0){
-        times.forEach((time, idx) => {
-            const yVals = protGene.filter(d => d.time === time).map(d => d.value);
-            if(yVals.length > 0){
-                protTraces.push({
-                    x: Array(yVals.length).fill(time),
-                    y: yVals,
-                    type: "box",
-                    name: "Protein",
-                    legendgroup: "Protein",
-                    showlegend: idx === 0,
-                    marker: {color: "#8281be"},
-                    boxmean: true,
-                    boxpoints: false
-                });
-            }
-        });
-        protTraces.push({
-            x: protGene.map(d => Number(d.time)),
-            y: protGene.map(d => d.value),
-            mode: "markers",
-            type: "scatter",
-            name: "Protein points",
-            legendgroup: "Protein",
-            showlegend: false,
-            marker: {color: "#8281be", size: 6, opacity: 0.8}
-        });
-
-        if(showSineFit){
-            const protFit = buildBiocycleFitTrace(protGene, "Protein", "#4f4e8f");
-            if(protFit) protTraces.push(protFit);
-        }
-    }
-
-    const traces = [...rnaTraces, ...protTraces];
-    const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
-    const temporalDatasetSuffix = rnaGene.length > 0 && protGene.length > 0 ? " — RNA & Protein"
-        : rnaGene.length > 0 ? " — RNA"
-        : " — Protein";
-
-    const layout = {
-        title: `Spatiotemporal Expression - ${displayGene} (${region})${temporalDatasetSuffix}`,
-        template: "simple_white",
-        height: 600,
-        showlegend: true,
-        legend: { orientation: 'h', y: 1.1 }
+    const getAxisRef = (rowIndex, columnIndex) => {
+        const axisIndex = (rowIndex * columns) + columnIndex + 1;
+        return {
+            x: axisIndex === 1 ? 'x' : `x${axisIndex}`,
+            y: axisIndex === 1 ? 'y' : `y${axisIndex}`,
+            suffix: axisIndex === 1 ? '' : String(axisIndex)
+        };
     };
 
-    if(rnaTraces.length > 0 && protTraces.length > 0){
-        layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
-        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis = {title: 'Log2 Normalized Counts', automargin: true};
-        layout.xaxis2 = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis2 = {title: 'LFQ', automargin: true};
-        rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
-        protTraces.forEach(t => { t.xaxis = 'x2'; t.yaxis = 'y2'; });
-    } else if(rnaTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis = {title: 'Log2 Normalized Counts', automargin: true};
-        rnaTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
-    } else if(protTraces.length > 0){
-        layout.xaxis = {title: 'Time (minutes)', type: 'linear', tickmode: 'array', tickvals: times, ticktext: timeLabels, range: [0, 150]};
-        layout.yaxis = {title: 'LFQ', automargin: true};
-        protTraces.forEach(t => { t.xaxis = 'x'; t.yaxis = 'y'; });
-    }
+    regionPanels.forEach((panel, panelIndex) => {
+        const rnaAxis = getAxisRef(0, panelIndex);
+        const protAxis = getAxisRef(1, panelIndex);
+        const regionLabel = panel.region;
+        const rnaLegendGroup = `${regionLabel}-RNA`;
+        const protLegendGroup = `${regionLabel}-Protein`;
+        const rnaRegionColor = getTemporalRegionHeaderColor('RNA', regionLabel);
+        const protRegionColor = getTemporalRegionHeaderColor('Protein', regionLabel);
+
+        if(panel.rnaGene.length > 0){
+            let rnaLegendShown = false;
+            times.forEach(time => {
+                const yVals = panel.rnaGene.filter(d => d.time === time).map(d => d.value);
+                if(yVals.length > 0){
+                    traces.push({
+                        x: Array(yVals.length).fill(time),
+                        y: yVals,
+                        type: "box",
+                        name: `${regionLabel} RNA`,
+                        legendgroup: rnaLegendGroup,
+                        showlegend: !rnaLegendShown,
+                        marker: {color: rnaRegionColor},
+                        line: {color: rnaRegionColor},
+                        boxmean: true,
+                        boxpoints: false,
+                        xaxis: rnaAxis.x,
+                        yaxis: rnaAxis.y
+                    });
+                    rnaLegendShown = true;
+                }
+            });
+
+            traces.push({
+                x: panel.rnaGene.map(d => Number(d.time)),
+                y: panel.rnaGene.map(d => d.value),
+                mode: "markers",
+                type: "scatter",
+                name: `${regionLabel} RNA points`,
+                legendgroup: rnaLegendGroup,
+                showlegend: false,
+                marker: {color: rnaRegionColor, size: 6, opacity: 0.8},
+                xaxis: rnaAxis.x,
+                yaxis: rnaAxis.y
+            });
+
+            if(showSineFit){
+                const rnaFit = buildBiocycleFitTrace(panel.rnaGene, "RNA", rnaRegionColor);
+                if(rnaFit){
+                    traces.push({
+                        ...rnaFit,
+                        name: `${regionLabel} ${rnaFit.name}`,
+                        legendgroup: rnaLegendGroup,
+                        xaxis: rnaAxis.x,
+                        yaxis: rnaAxis.y,
+                        showlegend: true
+                    });
+                }
+            }
+        }
+
+        if(panel.protGene.length > 0){
+            let protLegendShown = false;
+            times.forEach(time => {
+                const yVals = panel.protGene.filter(d => d.time === time).map(d => d.value);
+                if(yVals.length > 0){
+                    traces.push({
+                        x: Array(yVals.length).fill(time),
+                        y: yVals,
+                        type: "box",
+                        name: `${regionLabel} Protein`,
+                        legendgroup: protLegendGroup,
+                        showlegend: !protLegendShown,
+                        marker: {color: protRegionColor},
+                        line: {color: protRegionColor},
+                        boxmean: true,
+                        boxpoints: false,
+                        xaxis: protAxis.x,
+                        yaxis: protAxis.y
+                    });
+                    protLegendShown = true;
+                }
+            });
+
+            traces.push({
+                x: panel.protGene.map(d => Number(d.time)),
+                y: panel.protGene.map(d => d.value),
+                mode: "markers",
+                type: "scatter",
+                name: `${regionLabel} Protein points`,
+                legendgroup: protLegendGroup,
+                showlegend: false,
+                marker: {color: protRegionColor, size: 6, opacity: 0.8},
+                xaxis: protAxis.x,
+                yaxis: protAxis.y
+            });
+
+            if(showSineFit){
+                const protFit = buildBiocycleFitTrace(panel.protGene, "Protein", protRegionColor);
+                if(protFit){
+                    traces.push({
+                        ...protFit,
+                        name: `${regionLabel} ${protFit.name}`,
+                        legendgroup: protLegendGroup,
+                        xaxis: protAxis.x,
+                        yaxis: protAxis.y,
+                        showlegend: true
+                    });
+                }
+            }
+        }
+    });
+
+    const layout = {
+        title: `Spatiotemporal Expression - ${displayGene} (all regions)`,
+        template: "simple_white",
+        height: 700,
+        grid: {rows, columns, pattern: 'independent'},
+        showlegend: true,
+        legend: { orientation: 'h', y: 1.1 },
+        annotations: []
+    };
+
+    regionPanels.forEach((panel, panelIndex) => {
+        const rnaAxis = getAxisRef(0, panelIndex);
+        const protAxis = getAxisRef(1, panelIndex);
+
+        layout[`xaxis${rnaAxis.suffix}`] = {
+            title: 'Time (minutes)',
+            type: 'linear',
+            tickmode: 'array',
+            tickvals: times,
+            ticktext: timeLabels,
+            range: [0, 150]
+        };
+
+        layout[`xaxis${protAxis.suffix}`] = {
+            title: 'Time (minutes)',
+            type: 'linear',
+            tickmode: 'array',
+            tickvals: times,
+            ticktext: timeLabels,
+            range: [0, 150]
+        };
+
+        layout[`yaxis${rnaAxis.suffix}`] = {
+            title: panelIndex === 0 ? 'RNA (Log2 Normalized Counts)' : '',
+            automargin: true
+        };
+
+        layout[`yaxis${protAxis.suffix}`] = {
+            title: panelIndex === 0 ? 'Protein (LFQ)' : '',
+            automargin: true
+        };
+
+        layout.annotations.push({
+            text: panel.region,
+            x: 0.5,
+            y: 1.05,
+            xref: panelIndex === 0 ? 'x domain' : `x${panelIndex + 1} domain`,
+            yref: panelIndex === 0 ? 'y domain' : `y${panelIndex + 1} domain`,
+            showarrow: false,
+            font: {size: 13}
+        });
+    });
 
     plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
-    renderTemporalStatsPanel(gene, region, rnaGene, protGene);
     saveCurrentViewPlot();
 }
 
@@ -734,7 +978,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             x: xLabels,
             y: geneLabels,
             type: "heatmap",
-            coloraxis: 'coloraxis',
+            panelKind: 'expr'
         });
     }
     if(matrixProt.some(row => row.some(v => !isNaN(v)))){
@@ -744,7 +988,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             x: xLabels,
             y: geneLabels,
             type: "heatmap",
-            coloraxis: 'coloraxis',
+            panelKind: 'expr'
         });
     }
     if(matrixRho.some(row => row.some(v => !isNaN(v)))){
@@ -754,7 +998,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             x: ['Rho'],
             y: geneLabels,
             type: "heatmap",
-            coloraxis: 'coloraxis2',
+            panelKind: 'rho',
             text: rhoText,
             texttemplate: '%{text}',
             textfont: {size: Math.max(8, Math.min(12, yTickFontSize + 1))},
@@ -763,7 +1007,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     }
 
     const customPlotTitle = optionsOverride?.plotTitle;
-    const hasRhoPanel = panels.some(panel => panel.coloraxis === 'coloraxis2');
+    const hasRhoPanel = panels.some(panel => panel.panelKind === 'rho');
     const panelDomains = (() => {
         if(panels.length === 0) return [];
 
@@ -778,67 +1022,54 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
         const gap = panels.length > 1 ? 0.035 : 0;
         const rhoWidth = 0.10;
-        const nonRhoCount = panels.filter(panel => panel.coloraxis !== 'coloraxis2').length;
+        const nonRhoCount = panels.filter(panel => panel.panelKind !== 'rho').length;
         const remainingWidth = 1 - rhoWidth - (gap * (panels.length - 1));
         const mainWidth = nonRhoCount > 0 ? remainingWidth / nonRhoCount : remainingWidth;
 
         let currentStart = 0;
         return panels.map(panel => {
-            const width = panel.coloraxis === 'coloraxis2' ? rhoWidth : mainWidth;
+            const width = panel.panelKind === 'rho' ? rhoWidth : mainWidth;
             const domain = [currentStart, currentStart + width];
             currentStart += width + gap;
             return domain;
         });
     })();
 
+    const buildPanelColorbar = (domain, titleText, isRhoPanel = false) => {
+        const start = domain[0];
+        const end = domain[1];
+        const width = Math.max(0.08, end - start);
+        return {
+            title: {text: titleText, side: 'top', font: {size: 11}},
+            orientation: 'h',
+            x: (start + end) / 2,
+            xanchor: 'center',
+            y: -0.10,
+            yanchor: 'top',
+            len: Math.max(0.08, width * 0.9),
+            thickness: 10,
+            tickmode: isRhoPanel ? 'array' : undefined,
+            tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : undefined,
+            ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : undefined
+        };
+    };
+
     const layout = {
         title: customPlotTitle || "Spatial Expression Heatmap",
         height: heatmapHeight,
-        margin: {l: 220, r: hasRhoPanel ? 120 : 40, t: 90, b: 120},
-        coloraxis: {
-            colorscale: "Viridis",
-            colorbar: {
-                title: {text: "Z-score", side: "right", font: {size: 11}},
-                orientation: 'v',
-                x: 1.02,
-                xanchor: 'left',
-                y: 0.5,
-                yanchor: 'middle',
-                len: 0.65,
-                thickness: 10
-            }
-        },
-        coloraxis2: {
-            colorscale: SPATIAL_RHO_COLORSCALE,
-            cmin: -1,
-            cmax: 1,
-            cmid: 0,
-            colorbar: {
-                title: {text: "Rho", side: "right", font: {size: 11}},
-                orientation: 'v',
-                x: 1.1,
-                xanchor: 'left',
-                y: 0.5,
-                yanchor: 'middle',
-                len: 0.4,
-                thickness: 10,
-                tickmode: 'array',
-                tickvals: [-1, -0.5, 0, 0.5, 1],
-                ticktext: ['-1', '-0.5', '0', '0.5', '1']
-            }
-        },
+        margin: {l: 220, r: 40, t: 90, b: hasRhoPanel ? 180 : 150},
         annotations: []
     };
 
     if(hasRhoPanel){
-        layout.annotations.push(buildSpatialCorrelationGuideAnnotation({x: 1.18, y: 1.0}));
+        layout.annotations.push(buildSpatialCorrelationGuideAnnotation({x: 0.86, y: -0.33, xanchor: 'center'}));
     }
 
     const data = panels.map((panel, index) => {
         const axisSuffix = index === 0 ? '' : String(index + 1);
         const xAxisName = `xaxis${axisSuffix}`;
         const yAxisName = `yaxis${axisSuffix}`;
-        const tickAngle = panel.coloraxis === 'coloraxis2' ? 0 : (aggregationMode === "samples" ? -45 : 0);
+        const tickAngle = panel.panelKind === 'rho' ? 0 : (aggregationMode === "samples" ? -45 : 0);
 
         layout[xAxisName] = {
             title: '',
@@ -862,10 +1093,24 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             font: {size: 16}
         });
 
+        const isRhoPanel = panel.panelKind === 'rho';
         return {
-            ...panel,
+            z: panel.z,
+            x: panel.x,
+            y: panel.y,
+            type: panel.type,
+            text: panel.text,
+            texttemplate: panel.texttemplate,
+            textfont: panel.textfont,
+            hovertemplate: panel.hovertemplate,
             xaxis: index === 0 ? 'x' : `x${index + 1}`,
-            yaxis: index === 0 ? 'y' : `y${index + 1}`
+            yaxis: index === 0 ? 'y' : `y${index + 1}`,
+            colorscale: isRhoPanel ? SPATIAL_RHO_COLORSCALE : 'Viridis',
+            zmin: isRhoPanel ? -1 : -2,
+            zmax: isRhoPanel ? 1 : 2,
+            zmid: isRhoPanel ? 0 : undefined,
+            showscale: true,
+            colorbar: buildPanelColorbar(panelDomains[index], isRhoPanel ? 'Rho' : 'Z-score', isRhoPanel)
         };
     });
 
@@ -1935,51 +2180,88 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     });
     const subplotCount = Math.max(1, subplots.length);
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-
-    const customPlotTitle = optionsOverride?.plotTitle;
-
-    const layout = {
-        title: customPlotTitle || `Spatiotemporal Expression Heatmap - ${region}`,
-        height: heatmapHeight,
-        margin: {l: 230, r: subplots.length > 6 ? 220 : 140, t: 120, b: 145},
-        grid: {
-            rows: 1,
-            columns: subplotCount,
-            pattern: 'independent',
-            columnwidth: weights
-        },
-        annotations: []
-    };
-
-    console.info('[TemporalHeatmap] Grid summary:', {
-        subplotCount,
-        weights
+    const columnGap = subplotCount > 1 ? 0.015 : 0;
+    const totalGap = columnGap * Math.max(0, subplotCount - 1);
+    const usableDomain = Math.max(0.2, 1 - totalGap);
+    const subplotDomains = [];
+    let currentStart = 0;
+    weights.forEach((weight, index) => {
+        const width = (weight / totalWeight) * usableDomain;
+        const start = currentStart;
+        const end = Math.min(1, start + width);
+        subplotDomains.push([start, end]);
+        currentStart = end + (index < subplotCount - 1 ? columnGap : 0);
     });
 
-    const buildDomainColorbar = (index, totalBars, titleText) => {
-        const columnCount = totalBars > 6 ? 2 : 1;
-        const rowsPerColumn = Math.ceil(totalBars / columnCount);
-        const columnIndex = Math.floor(index / rowsPerColumn);
-        const rowIndex = index % rowsPerColumn;
-        const verticalStep = 0.92 / Math.max(1, rowsPerColumn);
-        const len = Math.min(0.22, Math.max(0.11, verticalStep * 0.72));
-        const y = 0.97 - (rowIndex * verticalStep);
+    const customPlotTitle = optionsOverride?.plotTitle;
+    const regionHeaderLabel = normalizeTemporalRegionKey(region);
+    const topMargin = 24;
+    const temporalColorbarCount = (rnaHasData || protHasData ? 1 : 0) + selectedMetrics.length;
+    const temporalColorbarColumns = temporalColorbarCount > 3 ? 2 : 1;
+    const temporalColorbarRows = Math.ceil(Math.max(1, temporalColorbarCount) / temporalColorbarColumns);
+    const bottomMargin = 125 + (temporalColorbarRows * 34);
+    const regionAlreadyInTitle = customPlotTitle
+        ? customPlotTitle.toLowerCase().includes(regionHeaderLabel.toLowerCase())
+        : false;
+    const headerTitle = customPlotTitle
+        ? (regionAlreadyInTitle ? customPlotTitle : `${customPlotTitle} - ${regionHeaderLabel}`)
+        : `Spatiotemporal Expression Heatmap - ${regionHeaderLabel}`;
+
+    setCurrentPlotMetadata({
+        modality: "spatiotemporal",
+        view: "heatmap",
+        source: plotContext.source || "manual",
+        region,
+        goId: plotContext.goId || "",
+        goName: plotContext.goName || "",
+        headerStrip: {
+            kind: "temporal-expression",
+            aggregationMode,
+            region,
+            title: headerTitle,
+            timepoints: xDisplayLabels,
+            leftMargin: 230,
+            rightMargin: 80,
+            columns: subplots.map(slot => ({
+                kind: slot.kind,
+                dataset: slot.dataset,
+                label: slot.title,
+                weight: slot.kind === "expr" ? 1 : 0.33
+            }))
+        }
+    });
+
+    const layout = {
+        title: '',
+        height: heatmapHeight,
+        margin: {l: 230, r: 80, t: topMargin, b: bottomMargin}
+    };
+
+    console.info('[TemporalHeatmap] Domain summary:', {
+        subplotCount,
+        weights,
+        columnGap,
+        subplotDomains
+    });
+
+    const buildDomainColorbar = (domain, titleText) => {
+        const start = domain[0];
+        const end = domain[1];
+        const width = Math.max(0.08, end - start);
 
         return {
-            title: {text: titleText, side: 'right', font: {size: 10}},
-            orientation: 'v',
-            x: 1.02 + (columnIndex * 0.09),
-            xanchor: 'left',
-            y,
+            title: {text: titleText, side: 'top', font: {size: 10}},
+            orientation: 'h',
+            x: (start + end) / 2,
+            xanchor: 'center',
+            y: -0.07,
             yanchor: 'top',
-            len,
+            len: Math.max(0.08, width * 0.9),
             thickness: 8
         };
     };
 
     const traces = [];
-    let expressionColorbarShown = false;
-    const shownMetricColorbars = new Set();
     subplots.forEach((slot, i) => {
         const axisIndex = i + 1;
         const xKey = axisIndex === 1 ? "x" : `x${axisIndex}`;
@@ -1990,17 +2272,21 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
 
         layout[layoutXKey] = {
             title: isExpression
-                ? (aggregationMode === "samples" ? "Sample" : "Time (minutes)")
+                ? ''
                 : '',
             type: 'category',
+            domain: subplotDomains[i],
+            anchor: yKey,
             tickangle: -45,
-            showticklabels: isExpression,
+            showticklabels: false,
             ticks: '',
             ticklen: 0
         };
         layout[layoutYKey] = {
             title: i === 0 ? 'Genes' : '',
             type: 'category',
+            domain: [0, 1],
+            anchor: xKey,
             automargin: true,
             categoryorder: 'array',
             categoryarray: geneLabels,
@@ -2011,8 +2297,6 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         };
 
         if(isExpression){
-            const showColorbar = !expressionColorbarShown;
-            expressionColorbarShown = true;
             traces.push({
                 z: slot.dataset === "RNA" ? matrixRNA : matrixProt,
                 x: xDisplayLabels,
@@ -2023,8 +2307,8 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
                 yaxis: yKey,
                 zmin: -2,
                 zmax: 2,
-                showscale: showColorbar,
-                colorbar: showColorbar ? buildDomainColorbar(i, subplots.length, 'Z-score') : undefined
+                showscale: true,
+                colorbar: buildDomainColorbar(subplotDomains[i], 'Z-score')
             });
         } else {
             const metricValues = buildMetricColumn(slot.dataset, slot.metric);
@@ -2036,8 +2320,6 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
                 const textColor = getMetricCellTextColor(slot.metric, metricZValues[rowIndex], scaleConfig);
                 return `<span style=\"color:${textColor};font-weight:600\">${rawText}</span>`;
             });
-            const showColorbar = !shownMetricColorbars.has(slot.metric);
-            shownMetricColorbars.add(slot.metric);
             traces.push({
                 z: metricZValues.map(v => [v]),
                 x: [slot.metric],
@@ -2056,20 +2338,11 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
                 hovertemplate: slot.metric === "PERIOD"
                     ? "%{y}<br>PERIOD: %{customdata[0]:.3f}<br>|Δ130|: %{z:.3f}<extra></extra>"
                     : "%{y}<br>" + slot.metric + ": %{customdata[0]:.3f}<extra></extra>",
-                showscale: showColorbar,
-                colorbar: showColorbar ? buildDomainColorbar(i, subplots.length, scaleConfig.colorbarTitle) : undefined
+                showscale: true,
+                colorbar: buildDomainColorbar(subplotDomains[i], scaleConfig.colorbarTitle)
             });
         }
 
-        layout.annotations.push({
-            text: `<b>${slot.title}</b>`,
-            x: 0.5,
-            y: 1.06,
-            xref: `${xKey} domain`,
-            yref: `${yKey} domain`,
-            showarrow: false,
-            font: {size: 13}
-        });
     });
 
     try {

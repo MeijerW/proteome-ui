@@ -75,7 +75,24 @@ display:block;
     min-width: 0;
     width: 100%;
     max-width: none;
-    padding: 24px 0 0;
+    padding: 0;
+}
+
+#plotColumn{
+    flex: 1 1 auto;
+    min-width: 0;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+}
+
+#plotHeaderStrip{
+    flex: 0 0 98px;
+    min-height: 98px;
+    max-height: 98px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 #plotLayout{
@@ -88,10 +105,109 @@ display:block;
     box-sizing: border-box;
 }
 
+#plotLayout.plot-layout--spatial-single #plotColumn{
+    max-width: min(74vw, 760px);
+}
+
+@media (max-width: 1100px){
+    #plotLayout.plot-layout--spatial-single #plotColumn{
+        max-width: 100%;
+    }
+}
+
 #plot .js-plotly-plot,
 #plot .plot-container,
 #plot .svg-container{
     width: 100% !important;
+}
+
+.plot-header-strip{
+    display:none;
+}
+
+.plot-header-strip.is-visible{
+    display:grid;
+    gap:0;
+    align-content:stretch;
+}
+
+.plot-header-strip--temporal{
+    grid-template-rows: 16px 14px 22px 24px;
+    padding-top: 0;
+}
+
+.plot-header-strip__title{
+    height: 16px;
+    line-height: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align:center;
+    color:#111111;
+}
+
+.plot-header-strip__cell{
+    min-width: 0;
+    height: 100%;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+}
+
+.plot-header-strip__cell--blank{
+    visibility:hidden;
+}
+
+.plot-header-strip__modality-label{
+    height: 14px;
+    line-height: 14px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align:center;
+    color:#000000;
+}
+
+.plot-header-strip__region-bar{
+    position:relative;
+    height: 22px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-top: 1px solid #000000;
+    box-sizing:border-box;
+    color:#000000;
+    font-size: 12px;
+    font-weight: 600;
+    overflow:hidden;
+}
+
+.plot-header-strip__timepoint-row{
+    display:grid;
+    gap:0;
+    height: 24px;
+}
+
+.plot-header-strip__timepoint{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 11px;
+    font-weight: 700;
+    color:#000000;
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    box-sizing:border-box;
+}
+
+.plot-header-strip__timepoint:last-child{
+    border-right:none;
+}
+
+.plot-header-strip__separator{
+    height: 2px;
+    background:#000000;
+}
+
+.plot-header-strip__metric-spacer{
+    height: 100%;
 }
 
 .stats-panel{
