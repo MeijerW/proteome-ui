@@ -272,6 +272,14 @@ function getTemporalRegionHeaderColor(dataset, region){
     return TEMPORAL_REGION_COLORS_PROTEIN[normalized] || TEMPORAL_REGION_COLORS_PROTEIN.Somite;
 }
 
+function getSpatialRegionHeaderColor(dataset, region){
+    const normalized = normalizeTemporalRegionKey(region);
+    if(dataset === 'RNA'){
+        return TEMPORAL_REGION_COLORS_RNA[normalized] || TEMPORAL_REGION_COLORS_RNA.Somite;
+    }
+    return TEMPORAL_REGION_COLORS_PROTEIN[normalized] || TEMPORAL_REGION_COLORS_PROTEIN.Somite;
+}
+
 function getPlotHeaderStripElement(){
     return document.getElementById('plotHeaderStrip');
 }
@@ -289,6 +297,7 @@ function clearPlotHeaderStrip(){
     strip.removeAttribute('data-region');
     strip.removeAttribute('data-mode');
     strip.removeAttribute('data-title');
+    strip.style.columnGap = '0px';
 }
 
 function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
@@ -303,21 +312,27 @@ function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
         && headerStrip.aggregationMode !== 'samples'
         && Array.isArray(headerStrip.columns)
         && headerStrip.columns.some(column => column.kind === 'expr');
+    const shouldShowSpatial = headerStrip
+        && headerStrip.kind === 'spatial-expression'
+        && Array.isArray(headerStrip.columns)
+        && headerStrip.columns.some(column => column.kind === 'expr');
 
-    if(!shouldShow){
+    if(!shouldShow && !shouldShowSpatial){
         clearPlotHeaderStrip();
         return;
     }
 
     const columns = headerStrip.columns;
     const timepoints = Array.isArray(headerStrip.timepoints) ? headerStrip.timepoints : [];
+    const rowLabels = Array.isArray(headerStrip.rowLabels) ? headerStrip.rowLabels : [];
     const regionLabel = normalizeTemporalRegionKey(metadata?.region || headerStrip.region || '');
     const leftMargin = Number(headerStrip.leftMargin) || 0;
     const rightMargin = Number(headerStrip.rightMargin) || 0;
     const headerTitle = String(headerStrip.title || '').trim();
+    const stripModeClass = shouldShowSpatial ? 'plot-header-strip plot-header-strip--spatial is-visible' : 'plot-header-strip plot-header-strip--temporal is-visible';
 
     strip.hidden = false;
-    strip.className = 'plot-header-strip plot-header-strip--temporal is-visible';
+    strip.className = stripModeClass;
     strip.dataset.modality = metadata?.modality || '';
     strip.dataset.view = metadata?.view || '';
     strip.dataset.source = metadata?.source || '';
@@ -327,6 +342,9 @@ function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
     strip.style.paddingLeft = `${leftMargin}px`;
     strip.style.paddingRight = `${rightMargin}px`;
     strip.style.gridTemplateColumns = columns.map(column => `${column.weight || 1}fr`).join(' ');
+    strip.style.columnGap = shouldShowSpatial
+        ? `${Math.max(0, Number(headerStrip.columnGap) || 0) * 100}%`
+        : '0px';
 
     strip.replaceChildren();
 
@@ -341,6 +359,7 @@ function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
     columns.forEach(column => {
         const cell = document.createElement('div');
         cell.className = 'plot-header-strip__cell';
+        cell.style.gridRow = '2 / -1';
 
         if(column.kind !== 'expr'){
             cell.classList.add('plot-header-strip__cell--blank');
@@ -354,24 +373,39 @@ function renderPlotHeaderStrip(metadata = CURRENT_PLOT_METADATA){
         cell.appendChild(modalityLabel);
 
         const regionBar = document.createElement('div');
-        regionBar.className = 'plot-header-strip__region-bar';
-        regionBar.style.backgroundColor = getTemporalRegionHeaderColor(column.dataset || column.label, metadata?.region || headerStrip.region);
-        regionBar.textContent = regionLabel;
+        regionBar.className = shouldShowSpatial
+            ? 'plot-header-strip__region-bar plot-header-strip__region-bar--spatial'
+            : 'plot-header-strip__region-bar';
+
+        if(shouldShowSpatial){
+            rowLabels.forEach(label => {
+                const regionCell = document.createElement('div');
+                regionCell.className = 'plot-header-strip__region-segment';
+                regionCell.style.backgroundColor = getSpatialRegionHeaderColor(column.dataset, label);
+                regionCell.textContent = label;
+                regionBar.appendChild(regionCell);
+            });
+        } else {
+            regionBar.style.backgroundColor = getTemporalRegionHeaderColor(column.dataset || column.label, metadata?.region || headerStrip.region);
+            regionBar.textContent = regionLabel;
+        }
         cell.appendChild(regionBar);
 
-        const timepointRow = document.createElement('div');
-        timepointRow.className = 'plot-header-strip__timepoint-row';
-        timepointRow.style.gridTemplateColumns = `repeat(${Math.max(1, timepoints.length)}, minmax(0, 1fr))`;
+        if(!shouldShowSpatial){
+            const timepointRow = document.createElement('div');
+            timepointRow.className = 'plot-header-strip__timepoint-row';
+            timepointRow.style.gridTemplateColumns = `repeat(${Math.max(1, timepoints.length)}, minmax(0, 1fr))`;
 
-        timepoints.forEach((timepoint, index) => {
-            const timepointCell = document.createElement('div');
-            timepointCell.className = 'plot-header-strip__timepoint';
-            timepointCell.style.backgroundColor = TEMPORAL_TIMEPOINT_HEADER_COLORS[index % TEMPORAL_TIMEPOINT_HEADER_COLORS.length];
-            timepointCell.textContent = String(timepoint);
-            timepointRow.appendChild(timepointCell);
-        });
+            timepoints.forEach((timepoint, index) => {
+                const timepointCell = document.createElement('div');
+                timepointCell.className = 'plot-header-strip__timepoint';
+                timepointCell.style.backgroundColor = TEMPORAL_TIMEPOINT_HEADER_COLORS[index % TEMPORAL_TIMEPOINT_HEADER_COLORS.length];
+                timepointCell.textContent = String(timepoint);
+                timepointRow.appendChild(timepointCell);
+            });
 
-        cell.appendChild(timepointRow);
+            cell.appendChild(timepointRow);
+        }
         strip.appendChild(cell);
     });
 }
@@ -411,7 +445,7 @@ function plotSpatial(){
         : rnaGene.length > 0 ? " — RNA"
         : " — Protein";
     const layout = {
-        title: `Spatial Expression - ${displayGene}${spatialDatasetSuffix}<br><sup>RNA-protein rho correlation: ${formatSpatialCorrelation(rhoValue)} (${rhoBand})</sup>`,
+        title: '',
         showlegend: true,
         template: "simple_white",
         height: 600,
@@ -688,7 +722,8 @@ function plotTemporal(){
                         legendgroup: rnaLegendGroup,
                         showlegend: !rnaLegendShown,
                         marker: {color: rnaRegionColor},
-                        line: {color: rnaRegionColor},
+                        fillcolor: rnaRegionColor,
+                        line: {color: "#4a4a4a"},
                         boxmean: true,
                         boxpoints: false,
                         xaxis: rnaAxis.x,
@@ -739,7 +774,8 @@ function plotTemporal(){
                         legendgroup: protLegendGroup,
                         showlegend: !protLegendShown,
                         marker: {color: protRegionColor},
-                        line: {color: protRegionColor},
+                        fillcolor: protRegionColor,
+                        line: {color: "#4a4a4a"},
                         boxmean: true,
                         boxpoints: false,
                         xaxis: protAxis.x,
@@ -779,7 +815,7 @@ function plotTemporal(){
     });
 
     const layout = {
-        title: `Spatiotemporal Expression - ${displayGene} (all regions)`,
+        title: '',
         template: "simple_white",
         height: 700,
         grid: {rows, columns, pattern: 'independent'},
@@ -798,6 +834,7 @@ function plotTemporal(){
             tickmode: 'array',
             tickvals: times,
             ticktext: timeLabels,
+            showticklabels: true,
             range: [0, 150]
         };
 
@@ -807,6 +844,7 @@ function plotTemporal(){
             tickmode: 'array',
             tickvals: times,
             ticktext: timeLabels,
+            showticklabels: true,
             range: [0, 150]
         };
 
@@ -1007,6 +1045,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     }
 
     const customPlotTitle = optionsOverride?.plotTitle;
+    const titleText = customPlotTitle || "Spatial Expression Heatmap";
     const hasRhoPanel = panels.some(panel => panel.panelKind === 'rho');
     const panelDomains = (() => {
         if(panels.length === 0) return [];
@@ -1044,7 +1083,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             orientation: 'h',
             x: (start + end) / 2,
             xanchor: 'center',
-            y: -0.10,
+            y: -0.01,
             yanchor: 'top',
             len: Math.max(0.08, width * 0.9),
             thickness: 10,
@@ -1054,10 +1093,29 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         };
     };
 
+    const stripColumnGap = hasRhoPanel ? 0.035 : (panels.length > 1 ? 0.04 : 0);
+
+    setCurrentPlotMetadata({
+        headerStrip: {
+            kind: 'spatial-expression',
+            title: titleText,
+            leftMargin: 220,
+            rightMargin: 40,
+            columnGap: stripColumnGap,
+            rowLabels: ['p-PSM', 'a-PSM', 'Somite'],
+            columns: panels.map(panel => ({
+                kind: panel.panelKind === 'expr' ? 'expr' : 'blank',
+                dataset: panel.title,
+                label: panel.title,
+                weight: panel.panelKind === 'rho' ? 0.35 : 1
+            }))
+        }
+    });
+
     const layout = {
-        title: customPlotTitle || "Spatial Expression Heatmap",
+        title: '',
         height: heatmapHeight,
-        margin: {l: 220, r: 40, t: 90, b: hasRhoPanel ? 180 : 150},
+        margin: {l: 220, r: 40, t: 90, b: hasRhoPanel ? 110 : 100},
         annotations: []
     };
 
@@ -1114,8 +1172,10 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         };
     });
 
-    plotWithResponsiveSizing("plot", data, layout);
-    saveCurrentViewPlot();
+    return Promise.resolve(plotWithResponsiveSizing("plot", data, layout)).then(result => {
+        saveCurrentViewPlot();
+        return result;
+    });
 }
 
 function getGenesFromRows(rows, predicate = null){
@@ -1165,9 +1225,65 @@ function setExplorerStatus(statusId, message){
     if(statusEl) statusEl.textContent = message;
 }
 
-function getExplorerRiskLabel(estimatedCells){
-    if(estimatedCells < 30000) return "low";
-    if(estimatedCells < 120000) return "medium";
+function formatElapsedSeconds(elapsedMs){
+    return `${(elapsedMs / 1000).toFixed(1)}s`;
+}
+
+function startExplorerRenderTimer(timerId, buttonId){
+    const timerEl = document.getElementById(timerId);
+    const buttonEl = document.getElementById(buttonId);
+    const startMs = performance.now();
+
+    if(buttonEl) buttonEl.disabled = true;
+    if(timerEl){
+        timerEl.classList.add('is-running');
+        timerEl.textContent = 'Rendering... 0.0s';
+    }
+
+    const intervalId = window.setInterval(() => {
+        if(timerEl){
+            timerEl.textContent = `Rendering... ${formatElapsedSeconds(performance.now() - startMs)}`;
+        }
+    }, 250);
+
+    return {timerEl, buttonEl, startMs, intervalId};
+}
+
+function stopExplorerRenderTimer(timerState, status = 'Rendered'){
+    if(!timerState) return;
+
+    window.clearInterval(timerState.intervalId);
+    if(timerState.buttonEl) timerState.buttonEl.disabled = false;
+    if(timerState.timerEl){
+        timerState.timerEl.classList.remove('is-running');
+        timerState.timerEl.textContent = `${status} in ${formatElapsedSeconds(performance.now() - timerState.startMs)}`;
+    }
+}
+
+function waitForNextPaint(){
+    return new Promise(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+}
+
+function getExplorerRiskLabel(estimatedCells, options = {}){
+    const benchmarkProfile = typeof window.getExplorerBenchmarkProfile === 'function'
+        ? window.getExplorerBenchmarkProfile()
+        : null;
+    const browserMultiplier = benchmarkProfile?.loadMultiplier || 1.12;
+    const subplotCount = Number(options.subplotCount) || 0;
+    const metricColumnCount = Number(options.metricColumnCount) || 0;
+    const aggregationMode = options.aggregationMode || 'average';
+    const hasTextCells = !!options.hasTextCells;
+
+    let adjustedLoad = estimatedCells * browserMultiplier;
+    adjustedLoad += subplotCount * 1800;
+    adjustedLoad += metricColumnCount * 3500;
+    if(hasTextCells) adjustedLoad *= 1.1;
+    if(aggregationMode === 'samples') adjustedLoad *= 1.25;
+
+    if(adjustedLoad < 18000) return "low";
+    if(adjustedLoad < 70000) return "medium";
     return "high";
 }
 
@@ -1357,7 +1473,13 @@ function getSpatialExplorerSelection(){
 
     const estimatedColumns = (replicateEstimate * 2) + 1;
     const estimatedCells = filteredGenes.length * estimatedColumns;
-    const risk = getExplorerRiskLabel(estimatedCells);
+    const subplotCount = 3;
+    const risk = getExplorerRiskLabel(estimatedCells, {
+        aggregationMode,
+        subplotCount,
+        metricColumnCount: 0,
+        hasTextCells: true
+    });
 
     return {
         rhoBand,
@@ -1370,6 +1492,7 @@ function getSpatialExplorerSelection(){
         deListRequiredButMissing,
         estimatedColumns,
         estimatedCells,
+        subplotCount,
         risk
     };
 }
@@ -1387,7 +1510,12 @@ function updateSpatialExplorerPreview(){
     const selection = getSpatialExplorerSelection();
     const preview = applyTopNPreview(selection.rankedGenes, "explorerSpatialTopNEnabled", "explorerSpatialTopN");
     const displayCells = preview.displayGenes.length * selection.estimatedColumns;
-    const displayRisk = getExplorerRiskLabel(displayCells);
+    const displayRisk = getExplorerRiskLabel(displayCells, {
+        aggregationMode: selection.aggregationMode,
+        subplotCount: selection.subplotCount,
+        metricColumnCount: 0,
+        hasTextCells: true
+    });
     if(selection.deListRequiredButMissing){
         setExplorerFeedback("explorerSpatialEstimate", "explorerSpatialAdvice", {
             estimateText: "DE list required but not loaded.",
@@ -1411,7 +1539,7 @@ function updateSpatialExplorerPreview(){
     });
 }
 
-function plotExplorerSpatialHeatmap(){
+async function plotExplorerSpatialHeatmap(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
         setExplorerStatus("explorerSpatialStatus", "Data is still loading. Please wait and try again.");
@@ -1449,19 +1577,28 @@ function plotExplorerSpatialHeatmap(){
         ? "all genes"
         : deStatus === "de" ? "DE only" : "non-DE only";
 
-    plotSpatialHeatmap(genesToPlot, {
-        membershipMode,
-        aggregationMode,
-        plotContext: {
-            source: "explorer"
-        },
-        plotTitle: `Spatial Explorer Heatmap - ${rhoLabel}, ${deLabel}`
-    });
-    const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
-    const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
-        ? ` Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes.`
-        : ` Plotted ${genesToPlot.length} genes.`;
-    setExplorerStatus("explorerSpatialStatus", `${previewNote}${heavyNote}`.trim());
+    const timerState = startExplorerRenderTimer("explorerSpatialPlotTimer", "explorerSpatialPlotBtn");
+
+    try {
+        await waitForNextPaint();
+        await plotSpatialHeatmap(genesToPlot, {
+            membershipMode,
+            aggregationMode,
+            plotContext: {
+                source: "explorer"
+            },
+            plotTitle: `Spatial Explorer Heatmap - ${rhoLabel}, ${deLabel}`
+        });
+        const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
+        const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
+            ? ` Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes.`
+            : ` Plotted ${genesToPlot.length} genes.`;
+        setExplorerStatus("explorerSpatialStatus", `${previewNote}${heavyNote}`.trim());
+        stopExplorerRenderTimer(timerState, 'Rendered');
+    } catch (err) {
+        stopExplorerRenderTimer(timerState, 'Failed');
+        throw err;
+    }
 }
 
 function hasMetricBelowThreshold(rows, metricName, threshold){
@@ -1542,7 +1679,13 @@ function getTemporalExplorerSelection(){
     const metricColumnCount = selectedMetrics.length;
     const estimatedColumns = (exprColumnCount + metricColumnCount) * datasetCount;
     const estimatedCells = filteredGenes.length * estimatedColumns;
-    const risk = getExplorerRiskLabel(estimatedCells);
+    const subplotCount = datasetCount * (1 + metricColumnCount);
+    const risk = getExplorerRiskLabel(estimatedCells, {
+        aggregationMode,
+        subplotCount,
+        metricColumnCount,
+        hasTextCells: metricColumnCount > 0
+    });
 
     return {
         region,
@@ -1556,6 +1699,8 @@ function getTemporalExplorerSelection(){
         topNSortMode,
         estimatedColumns,
         estimatedCells,
+        subplotCount,
+        metricColumnCount,
         risk
     };
 }
@@ -1573,7 +1718,12 @@ function updateTemporalExplorerPreview(){
     const selection = getTemporalExplorerSelection();
     const preview = applyTopNPreview(selection.rankedGenes, "explorerTemporalTopNEnabled", "explorerTemporalTopN");
     const displayCells = preview.displayGenes.length * selection.estimatedColumns;
-    const displayRisk = getExplorerRiskLabel(displayCells);
+    const displayRisk = getExplorerRiskLabel(displayCells, {
+        aggregationMode: selection.aggregationMode,
+        subplotCount: selection.subplotCount,
+        metricColumnCount: selection.metricColumnCount,
+        hasTextCells: selection.metricColumnCount > 0
+    });
     const thresholdText = selection.threshold === null
         ? "no threshold"
         : `${selection.pValueMetric} <= ${selection.threshold}`;
@@ -1592,7 +1742,7 @@ function updateTemporalExplorerPreview(){
     });
 }
 
-function plotExplorerTemporalHeatmap(){
+async function plotExplorerTemporalHeatmap(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
         setExplorerStatus("explorerTemporalStatus", "Data is still loading. Please wait and try again.");
@@ -1617,21 +1767,30 @@ function plotExplorerTemporalHeatmap(){
     }
 
     const thresholdLabel = threshold === null ? "no p-value filter" : `${pValueMetric} <= ${threshold}`;
-    renderTemporalHeatmapFromGenes(genesToPlot, region, {
-        membershipMode,
-        aggregationMode,
-        selectedMetrics,
-        plotContext: {
-            source: "explorer",
-            region
-        },
-        plotTitle: `Spatiotemporal Explorer Heatmap - ${region} (${thresholdLabel})`
-    });
-    const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
-    const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
-        ? `Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes for ${region} (${thresholdLabel}).`
-        : `Plotted ${genesToPlot.length} genes for ${region} (${thresholdLabel}).`;
-    setExplorerStatus("explorerTemporalStatus", `${previewNote} ${heavyNote}`.trim());
+    const timerState = startExplorerRenderTimer("explorerTemporalPlotTimer", "explorerTemporalPlotBtn");
+
+    try {
+        await waitForNextPaint();
+        await renderTemporalHeatmapFromGenes(genesToPlot, region, {
+            membershipMode,
+            aggregationMode,
+            selectedMetrics,
+            plotContext: {
+                source: "explorer",
+                region
+            },
+            plotTitle: `Spatiotemporal Explorer Heatmap - ${region} (${thresholdLabel})`
+        });
+        const heavyNote = selection.risk === "high" ? " Full selection is large; preview mode is recommended." : "";
+        const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
+            ? `Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes for ${region} (${thresholdLabel}).`
+            : `Plotted ${genesToPlot.length} genes for ${region} (${thresholdLabel}).`;
+        setExplorerStatus("explorerTemporalStatus", `${previewNote} ${heavyNote}`.trim());
+        stopExplorerRenderTimer(timerState, 'Rendered');
+    } catch (err) {
+        stopExplorerRenderTimer(timerState, 'Failed');
+        throw err;
+    }
 }
 
 function updateExplorerPreviews(){
@@ -2195,11 +2354,11 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
 
     const customPlotTitle = optionsOverride?.plotTitle;
     const regionHeaderLabel = normalizeTemporalRegionKey(region);
-    const topMargin = 24;
+    const topMargin = 52;
     const temporalColorbarCount = (rnaHasData || protHasData ? 1 : 0) + selectedMetrics.length;
     const temporalColorbarColumns = temporalColorbarCount > 3 ? 2 : 1;
     const temporalColorbarRows = Math.ceil(Math.max(1, temporalColorbarCount) / temporalColorbarColumns);
-    const bottomMargin = 125 + (temporalColorbarRows * 34);
+    const bottomMargin = 95 + (temporalColorbarRows * 26);
     const regionAlreadyInTitle = customPlotTitle
         ? customPlotTitle.toLowerCase().includes(regionHeaderLabel.toLowerCase())
         : false;
@@ -2234,7 +2393,8 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     const layout = {
         title: '',
         height: heatmapHeight,
-        margin: {l: 230, r: 80, t: topMargin, b: bottomMargin}
+        margin: {l: 230, r: 80, t: topMargin, b: bottomMargin},
+        annotations: []
     };
 
     console.info('[TemporalHeatmap] Domain summary:', {
@@ -2254,7 +2414,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             orientation: 'h',
             x: (start + end) / 2,
             xanchor: 'center',
-            y: -0.07,
+            y: -0.01,
             yanchor: 'top',
             len: Math.max(0.08, width * 0.9),
             thickness: 8
@@ -2269,6 +2429,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         const layoutXKey = axisIndex === 1 ? "xaxis" : `xaxis${axisIndex}`;
         const layoutYKey = axisIndex === 1 ? "yaxis" : `yaxis${axisIndex}`;
         const isExpression = slot.kind === "expr";
+        const showTimepointTicks = isExpression && aggregationMode !== "samples";
 
         layout[layoutXKey] = {
             title: isExpression
@@ -2277,8 +2438,11 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             type: 'category',
             domain: subplotDomains[i],
             anchor: yKey,
-            tickangle: -45,
-            showticklabels: false,
+            tickangle: showTimepointTicks ? 0 : -45,
+            showticklabels: showTimepointTicks,
+            tickmode: showTimepointTicks ? 'array' : undefined,
+            tickvals: showTimepointTicks ? xDisplayLabels : undefined,
+            ticktext: showTimepointTicks ? xDisplayLabels.map(value => String(value)) : undefined,
             ticks: '',
             ticklen: 0
         };
@@ -2295,6 +2459,18 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             ticks: '',
             ticklen: 0
         };
+
+        layout.annotations.push({
+            text: slot.title,
+            x: 0.5,
+            y: 1.03,
+            xref: axisIndex === 1 ? 'x domain' : `x${axisIndex} domain`,
+            yref: axisIndex === 1 ? 'y domain' : `y${axisIndex} domain`,
+            showarrow: false,
+            xanchor: 'center',
+            yanchor: 'bottom',
+            font: {size: 12, color: '#111111'}
+        });
 
         if(isExpression){
             traces.push({
@@ -2345,8 +2521,9 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
 
     });
 
+    let plotPromise;
     try {
-        plotWithResponsiveSizing("plot", traces, layout);
+        plotPromise = plotWithResponsiveSizing("plot", traces, layout);
     } catch (err) {
         console.error("Temporal heatmap rendering failed", err, {
             region,
@@ -2364,9 +2541,30 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         alert(`Failed to render spatiotemporal heatmap: ${err.message}`);
         return;
     }
-    console.info('[TemporalHeatmap] Plot rendered successfully.', { traceCount: traces.length, genes: entries.length });
-    console.groupEnd();
-    saveCurrentViewPlot();
+    return Promise.resolve(plotPromise)
+        .then(result => {
+            console.info('[TemporalHeatmap] Plot rendered successfully.', { traceCount: traces.length, genes: entries.length });
+            console.groupEnd();
+            saveCurrentViewPlot();
+            return result;
+        })
+        .catch(err => {
+            console.error("Temporal heatmap rendering failed", err, {
+                region,
+                genesRequested: genes.length,
+                genesMatched: entries.length,
+                aggregationMode,
+                membershipMode,
+                selectedMetrics,
+                xLabelCount: xDisplayLabels.length,
+                subplotCount: subplots.length,
+                weights,
+                traceCount: traces.length
+            });
+            console.groupEnd();
+            alert(`Failed to render spatiotemporal heatmap: ${err.message}`);
+            throw err;
+        });
 }
 
 function plotTemporalHeatmap(overrideGenes, regionOverride, optionsOverride = null){

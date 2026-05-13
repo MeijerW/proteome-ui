@@ -1,3 +1,152 @@
+const EXPLORER_BENCHMARK_CACHE_KEY = 'proteomeui.explorerBenchmark.v1';
+const EXPLORER_BENCHMARK_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+let EXPLORER_BENCHMARK_PROFILE = null;
+
+function getExplorerBenchmarkSignature(){
+  return JSON.stringify({
+    userAgent: navigator.userAgent || '',
+    platform: navigator.platform || '',
+    hardwareConcurrency: navigator.hardwareConcurrency || null,
+    deviceMemory: navigator.deviceMemory || null,
+    pixelRatio: window.devicePixelRatio || 1
+  });
+}
+
+function getBrowserFamily(){
+  const ua = navigator.userAgent || '';
+  if(/firefox/i.test(ua)) return 'firefox';
+  if(/edg/i.test(ua)) return 'edge';
+  if(/chrome|chromium/i.test(ua) && !/edg|opr/i.test(ua)) return 'chrome';
+  if(/safari/i.test(ua) && !/chrome|chromium|edg/i.test(ua)) return 'safari';
+  return 'other';
+}
+
+function getBrowserMultiplier(browserFamily = getBrowserFamily()){
+  if(browserFamily === 'safari') return 1.2;
+  if(browserFamily === 'firefox') return 1.08;
+  return 1;
+}
+
+function readExplorerBenchmarkCache(){
+  try {
+    const raw = window.localStorage.getItem(EXPLORER_BENCHMARK_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || parsed.signature !== getExplorerBenchmarkSignature()) return null;
+    if(!parsed.measuredAt || (Date.now() - parsed.measuredAt) > EXPLORER_BENCHMARK_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeExplorerBenchmarkCache(profile){
+  try {
+    window.localStorage.setItem(EXPLORER_BENCHMARK_CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    // localStorage unavailable or quota exceeded; ignore and keep in-memory profile only.
+  }
+}
+
+function setExplorerBenchmarkProfile(profile){
+  EXPLORER_BENCHMARK_PROFILE = profile;
+  document.dispatchEvent(new CustomEvent('explorerBenchmarkReady', {detail: profile}));
+}
+
+function buildExplorerBenchmarkProfile(benchmarkMs){
+  const browserFamily = getBrowserFamily();
+  let tier = 'balanced';
+  let multiplier = 1.12;
+
+  if(benchmarkMs <= 180){
+    tier = 'fast';
+    multiplier = 0.92;
+  } else if(benchmarkMs >= 420){
+    tier = 'slow';
+    multiplier = 1.35;
+  }
+
+  multiplier *= getBrowserMultiplier(browserFamily);
+
+  return {
+    signature: getExplorerBenchmarkSignature(),
+    measuredAt: Date.now(),
+    benchmarkMs,
+    browserFamily,
+    tier,
+    loadMultiplier: Number(multiplier.toFixed(3))
+  };
+}
+
+async function runExplorerBenchmark(){
+  if(typeof Plotly === 'undefined' || !document.body){
+    return buildExplorerBenchmarkProfile(260);
+  }
+
+  const host = document.createElement('div');
+  host.style.position = 'fixed';
+  host.style.left = '-10000px';
+  host.style.top = '0';
+  host.style.width = '720px';
+  host.style.height = '360px';
+  host.style.pointerEvents = 'none';
+  host.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(host);
+
+  const matrix = Array.from({length: 50}, (_, rowIndex) =>
+    Array.from({length: 12}, (_, colIndex) => Math.sin((rowIndex + 1) * (colIndex + 1) / 9))
+  );
+  const trace = (axisSuffix = '') => ({
+    z: matrix,
+    x: Array.from({length: 12}, (_, idx) => `T${idx + 1}`),
+    y: Array.from({length: 50}, (_, idx) => `G${idx + 1}`),
+    type: 'heatmap',
+    colorscale: 'Viridis',
+    showscale: false,
+    xaxis: axisSuffix ? `x${axisSuffix}` : 'x',
+    yaxis: axisSuffix ? `y${axisSuffix}` : 'y'
+  });
+
+  const data = [trace(''), trace('2'), trace('3'), trace('4')];
+  const layout = {
+    width: 720,
+    height: 360,
+    margin: {l: 40, r: 20, t: 20, b: 30},
+    grid: {rows: 2, columns: 2, pattern: 'independent'}
+  };
+
+  const start = performance.now();
+  try {
+    await Plotly.newPlot(host, data, layout, {displayModeBar: false, staticPlot: true, responsive: false});
+  } finally {
+    try {
+      Plotly.purge(host);
+    } catch {
+      // Ignore purge failures.
+    }
+    host.remove();
+  }
+
+  return buildExplorerBenchmarkProfile(Math.round(performance.now() - start));
+}
+
+async function initializeExplorerBenchmark(){
+  const cachedProfile = readExplorerBenchmarkCache();
+  if(cachedProfile){
+    setExplorerBenchmarkProfile(cachedProfile);
+    return cachedProfile;
+  }
+
+  const profile = await runExplorerBenchmark();
+  writeExplorerBenchmarkCache(profile);
+  setExplorerBenchmarkProfile(profile);
+  return profile;
+}
+
+function getExplorerBenchmarkProfile(){
+  return EXPLORER_BENCHMARK_PROFILE;
+}
+
 function getActiveMainTabId(){
   const activeMain = document.querySelector(".main-tab-content.active");
   return activeMain ? activeMain.id : null;
@@ -186,6 +335,7 @@ function setupExplorerPreviewBindings(){
   });
 
   document.addEventListener('proteomeDataLoaded', triggerUpdate);
+  document.addEventListener('explorerBenchmarkReady', triggerUpdate);
   triggerUpdate();
 }
 
@@ -193,5 +343,7 @@ setupKeyboardShortcuts();
 setupPValueFilterControls();
 setupTemporalSineFitAutoReplot();
 setupExplorerPreviewBindings();
+initializeExplorerBenchmark();
 
 window.getCurrentViewKey = getCurrentViewKey;
+window.getExplorerBenchmarkProfile = getExplorerBenchmarkProfile;

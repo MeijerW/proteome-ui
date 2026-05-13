@@ -95,6 +95,12 @@ display:block;
     overflow: hidden;
 }
 
+#plotHeaderStrip.plot-header-strip--spatial{
+    flex-basis: 74px;
+    min-height: 74px;
+    max-height: 74px;
+}
+
 #plotLayout{
     display:flex;
     align-items:flex-start;
@@ -136,6 +142,11 @@ display:block;
     padding-top: 0;
 }
 
+.plot-header-strip--spatial{
+    grid-template-rows: 18px 16px 24px;
+    padding-top: 0;
+}
+
 .plot-header-strip__title{
     height: 16px;
     line-height: 16px;
@@ -166,6 +177,17 @@ display:block;
     color:#000000;
 }
 
+.plot-header-strip--spatial .plot-header-strip__modality-label{
+    height: 16px;
+    line-height: 16px;
+    border-radius: 3px 3px 0 0;
+    background:#f3f5f7;
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    color:#111111;
+}
+
 .plot-header-strip__region-bar{
     position:relative;
     height: 22px;
@@ -178,6 +200,31 @@ display:block;
     font-size: 12px;
     font-weight: 600;
     overflow:hidden;
+}
+
+.plot-header-strip__region-bar--spatial{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap:0;
+    height: 24px;
+    border-top: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.plot-header-strip__region-segment{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-width:0;
+    height: 100%;
+    font-size: 10px;
+    font-weight: 700;
+    color:#111111;
+    border-right: 1px solid rgba(255, 255, 255, 0.25);
+    box-sizing:border-box;
+}
+
+.plot-header-strip__region-segment:last-child{
+    border-right:none;
 }
 
 .plot-header-strip__timepoint-row{
@@ -419,6 +466,24 @@ button:disabled {
 .explorer-preview-controls input[type="number"] {
     width: 92px;
     max-width: 92px;
+
+.explorer-action-row {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.explorer-render-timer {
+    min-height: 1.2rem;
+    font-size: 0.9rem;
+    color: #4a5a61;
+}
+
+.explorer-render-timer.is-running {
+    color: #8a5a00;
+    font-variant-numeric: tabular-nums;
+}
     padding: 8px 10px;
 }
 

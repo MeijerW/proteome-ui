@@ -47,8 +47,31 @@ function parseDifferentialGeneList(text){
         .map(line => line.trim())
         .filter(line => line)
         .forEach(line => {
-            const gene = cleanQuotedValue(line);
-            if(gene) genes.add(gene.toLowerCase());
+            // DE list may be a quoted index+gene table, e.g. "1"\t"Arhgap33".
+            const quotedTokens = Array.from(line.matchAll(/"([^"]+)"/g)).map(match => String(match[1] || '').trim());
+            let gene = '';
+
+            if(quotedTokens.length > 0){
+                // Prefer the last non-numeric quoted token, then fallback to the last quoted token.
+                for(let idx = quotedTokens.length - 1; idx >= 0; idx -= 1){
+                    if(/[a-zA-Z]/.test(quotedTokens[idx])){
+                        gene = quotedTokens[idx];
+                        break;
+                    }
+                }
+                if(!gene) gene = quotedTokens[quotedTokens.length - 1] || '';
+            } else {
+                // Fallback for unquoted formats: split common delimiters and take the last token.
+                const parts = line
+                    .split(/[\t,]+|\s{2,}/)
+                    .map(token => cleanQuotedValue(token))
+                    .filter(Boolean);
+                gene = parts.length > 0 ? parts[parts.length - 1] : cleanQuotedValue(line);
+            }
+
+            if(gene && String(gene).toLowerCase() !== 'x'){
+                genes.add(String(gene).toLowerCase());
+            }
         });
     return genes;
 }

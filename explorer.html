@@ -308,6 +308,7 @@ Spatiotemporal Filters
 <div id="explorerSpatial" class="subtab-content active">
 
 <h3>Spatial Data Explorer</h3>
+<p class="go-timing-note">&#9432; Be cautious with Top-N preview settings: very high N values (or disabling Top-N preview) can generate very large heatmaps and may freeze or crash your browser.</p>
 
 <label for="explorerSpatialRhoBand">Rho filter:</label>
 <select id="explorerSpatialRhoBand">
@@ -350,7 +351,10 @@ Spatiotemporal Filters
 </select>
 </div>
 
+<div class="explorer-action-row">
 <button id="explorerSpatialPlotBtn" onclick="plotExplorerSpatialHeatmap()">Plot Data</button>
+<span id="explorerSpatialPlotTimer" class="explorer-render-timer" aria-live="polite"></span>
+</div>
 <p id="explorerSpatialEstimate" class="explorer-estimate"></p>
 <p id="explorerSpatialAdvice" class="explorer-advice"></p>
 <p id="explorerSpatialStatus" style="margin-top: 0.5rem; font-size: 0.9rem; color: #333;"></p>
@@ -361,6 +365,7 @@ Spatiotemporal Filters
 <div id="explorerTemporal" class="subtab-content">
 
 <h3>Spatiotemporal Data Explorer</h3>
+<p class="go-timing-note">&#9432; Be cautious with Top-N preview settings: very high N values (or disabling Top-N preview) can generate very large heatmaps and may freeze or crash your browser.</p>
 
 <p class="region-prompt">Which region would you like to look at?</p>
 <select id="explorerTemporalRegion">
@@ -425,7 +430,10 @@ Spatiotemporal Filters
 </select>
 </div>
 
+<div class="explorer-action-row">
 <button id="explorerTemporalPlotBtn" onclick="plotExplorerTemporalHeatmap()">Plot Data</button>
+<span id="explorerTemporalPlotTimer" class="explorer-render-timer" aria-live="polite"></span>
+</div>
 <p id="explorerTemporalEstimate" class="explorer-estimate"></p>
 <p id="explorerTemporalAdvice" class="explorer-advice"></p>
 <p id="explorerTemporalStatus" style="margin-top: 0.5rem; font-size: 0.9rem; color: #333;"></p>
