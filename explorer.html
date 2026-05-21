@@ -88,6 +88,13 @@ placeholder="Enter genes separated by commas"></textarea>
 <option value="samples">Individual samples (if available)</option>
 </select>
 
+<label for="spatialDeStatus">Differential expression:</label>
+<select id="spatialDeStatus">
+<option value="all" selected>All genes</option>
+<option value="de">Differentially expressed only</option>
+<option value="nonde">Not differentially expressed only</option>
+</select>
+
 <label for="spatialClusterMode">Row order:</label>
 <select id="spatialClusterMode">
 <option value="none" selected>Default: posterior mean (RNA+Protein) high to low</option>
@@ -256,6 +263,13 @@ GO Spatiotemporal Heatmap
 <select id="goSpatialAggregation">
 <option value="average" selected>Average per region</option>
 <option value="samples">Individual samples (if available)</option>
+</select>
+
+<label for="goSpatialDeStatus">Differential expression:</label>
+<select id="goSpatialDeStatus">
+<option value="all" selected>All genes</option>
+<option value="de">Differentially expressed only</option>
+<option value="nonde">Not differentially expressed only</option>
 </select>
 
 <label for="goSpatialClusterMode">Row order:</label>

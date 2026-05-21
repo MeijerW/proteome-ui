@@ -1141,8 +1141,16 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const groups = ['Posterior', 'Anterior', 'Somite'];
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("spatialGeneMembership");
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("spatialAggregation");
+    const deStatus = optionsOverride?.deStatus || (document.getElementById("spatialDeStatus")?.value || "all");
     const clusterMode = optionsOverride?.clusterMode || getSpatialClusterMode("spatialClusterMode");
     const plotContext = optionsOverride?.plotContext || {};
+    const differentialSet = getDifferentialGeneSet();
+    const deListRequiredButMissing = (deStatus === "de" || deStatus === "nonde") && differentialSet.size === 0;
+
+    if(deListRequiredButMissing){
+        alert("Differential-expression gene list was not loaded. Check the DE list filename in data loading configuration.");
+        return;
+    }
     setCurrentPlotMetadata({
         modality: "spatial",
         view: "heatmap",
@@ -1164,6 +1172,9 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         const hasProt = protGene.length > 0;
         if(!hasRna && !hasProt) return;
         if(membershipMode === "both" && !(hasRna && hasProt)) return;
+
+        const geneKey = String(rnaGene[0]?.ID || protGene[0]?.ID || gene).toLowerCase();
+        if(!passesDeFilter(geneKey, deStatus, differentialSet)) return;
 
         const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
         const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
@@ -1383,8 +1394,13 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             xanchor: 'center',
             y: -0.01,
             yanchor: 'top',
-            len: Math.max(0.08, width * 0.9),
+            len: width,
+            lenmode: 'fraction',
             thickness: 10,
+            thicknessmode: 'pixels',
+            xpad: 0,
+            ypad: 0,
+            outlinewidth: 0,
             tickmode: isRhoPanel ? 'array' : undefined,
             tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : undefined,
             ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : undefined
@@ -2471,6 +2487,7 @@ async function plotGoSpatialHeatmap(){
         const goOptions = {
             membershipMode: getHeatmapGeneMembership("goSpatialGeneMembership"),
             aggregationMode: getAggregationMode("goSpatialAggregation"),
+            deStatus: (document.getElementById("goSpatialDeStatus")?.value || "all"),
             clusterMode: getSpatialClusterMode("goSpatialClusterMode"),
             plotContext: {
                 source: "go",
