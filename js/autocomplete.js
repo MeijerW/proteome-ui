@@ -54,15 +54,27 @@ function setupGeneStartsWithFilter(inputId, datalistId, getList){
 }
 
 function updateTemporalGenes(){
-    const region = document.getElementById('region').value || document.getElementById('heatmapRegion').value;
+    const regionNode = document.getElementById('region') || document.getElementById('heatmapRegion');
+    const region = regionNode ? String(regionNode.value || '').trim() : '';
+    if(!region){
+        geneListTemporal = [];
+        return;
+    }
     geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.ID).filter(g => g))].sort();
     // Trigger the starts-with filter to refresh with the new region's gene list
     const input = document.getElementById('temporalGene');
     if(input) input.dispatchEvent(new Event('input'));
 }
 
-document.getElementById('region').addEventListener('change', updateTemporalGenes);
-document.getElementById('heatmapRegion').addEventListener('change', updateTemporalGenes);
+const regionSelect = document.getElementById('region');
+if(regionSelect){
+    regionSelect.addEventListener('change', updateTemporalGenes);
+}
+
+const heatmapRegionSelect = document.getElementById('heatmapRegion');
+if(heatmapRegionSelect){
+    heatmapRegionSelect.addEventListener('change', updateTemporalGenes);
+}
 
 function syncGoInputs(sourceId){
     const source = document.getElementById(sourceId);
