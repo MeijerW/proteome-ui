@@ -1777,8 +1777,6 @@ function sortSpatialGenesByMode(genes, mode){
     };
 
     rows.sort((a, b) => {
-        if(mode === "rho_abs_asc") return withNaNLast(a, b, Math.abs(a.rho), Math.abs(b.rho));
-        if(mode === "rho_abs_desc") return withNaNLast(a, b, -Math.abs(a.rho), -Math.abs(b.rho));
         if(mode === "rho_asc") return withNaNLast(a, b, a.rho, b.rho);
         if(mode === "rho_desc") return withNaNLast(a, b, -a.rho, -b.rho);
         return String(a.gene).localeCompare(String(b.gene));
@@ -1828,7 +1826,7 @@ function getSpatialExplorerSelection(){
     const membershipMode = document.getElementById("explorerSpatialMembership")?.value || "all";
     const aggregationMode = document.getElementById("explorerSpatialAggregation")?.value || "average";
     const clusterMode = getSpatialClusterMode("explorerSpatialClusterMode");
-    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_abs_asc";
+    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_desc";
 
     const groups = ["Posterior", "Anterior", "Somite"];
     const byGene = new Map();
