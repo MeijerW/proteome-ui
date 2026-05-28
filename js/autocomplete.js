@@ -9,7 +9,11 @@ async function loadGenes(){
     while(RNA_DATA.length === 0){
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-    geneList = [...new Set(RNA_DATA.map(d => d.ID).filter(g => g))].sort();
+    const canonicalGenes = RNA_DATA.map(d => d.ID).filter(g => g)
+    const aliasNames = typeof window.getAliasAutocompleteList === 'function'
+        ? window.getAliasAutocompleteList()
+        : []
+    geneList = [...new Set(canonicalGenes.concat(aliasNames))].sort();
     updateTemporalGenes();
     // Set up starts-with autocomplete for both gene inputs (replaces full-list datalist)
     setupGeneStartsWithFilter('spatialGene', 'genes', () => geneList);
@@ -57,11 +61,18 @@ function setupGeneStartsWithFilter(inputId, datalistId, getList){
 function updateTemporalGenes(){
     const regionNode = document.getElementById('region') || document.getElementById('heatmapRegion');
     const region = regionNode ? String(regionNode.value || '').trim() : '';
+    const aliasNames = typeof window.getAliasAutocompleteList === 'function'
+        ? window.getAliasAutocompleteList()
+        : []
     if(!region){
-        geneListTemporal = [];
+        geneListTemporal = [...new Set(aliasNames)].sort();
         return;
     }
-    geneListTemporal = [...new Set(RNA_DATA.filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0).map(d => d.ID).filter(g => g))].sort();
+    const temporalGenes = RNA_DATA
+        .filter(d => d.region && d.region.toLowerCase() === region.toLowerCase() && d.time >= 0)
+        .map(d => d.ID)
+        .filter(g => g)
+    geneListTemporal = [...new Set(temporalGenes.concat(aliasNames))].sort();
     // Trigger the starts-with filter to refresh with the new region's gene list
     const input = document.getElementById('temporalGene');
     if(input) input.dispatchEvent(new Event('input'));

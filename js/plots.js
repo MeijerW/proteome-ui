@@ -131,6 +131,7 @@ function parseGeneInput(input){
         .map(token => token.trim())
         .map(token => token.replace(/^["']+|["']+$/g, ""))
         .filter(token => token.length > 0)
+        .map(token => typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(token) : token)
         .map(token => token.toLowerCase());
 
     return Array.from(new Set(tokens));
@@ -192,7 +193,16 @@ function restorePlotStateForView(viewKey){
 
 function getSpatialCorrelationEntry(gene){
     if(!gene || typeof RHO_CORRELATION_DATA === "undefined" || !(RHO_CORRELATION_DATA instanceof Map)) return null;
-    return RHO_CORRELATION_DATA.get(String(gene).trim().toLowerCase()) || null;
+    const trimmed = String(gene).trim();
+    const direct = RHO_CORRELATION_DATA.get(trimmed.toLowerCase());
+    if(direct) return direct;
+
+    if(typeof window.resolveGeneAlias === "function"){
+        const canonical = String(window.resolveGeneAlias(trimmed) || "").trim().toLowerCase();
+        if(canonical) return RHO_CORRELATION_DATA.get(canonical) || null;
+    }
+
+    return null;
 }
 
 function getSpatialCorrelationValue(gene){
@@ -226,7 +236,7 @@ function buildSpatialCorrelationGuideAnnotation({ x = 1.02, y = 1.0, xanchor = '
         borderwidth: 1,
         borderpad: 8,
         font: {size: 11, color: '#40362e'},
-        text: '<b>Rho guide</b><br>rho &gt; 0.5: highly correlated<br>-0.5 ≤ rho ≤ 0.5: lowly correlated<br>rho &lt; -0.5: anti-correlated'
+        text: '<b>Rho guide</b><br>rho &gt; 0.5: highly correlated<br>-0.5 <= rho <= 0.5: lowly correlated<br>rho &lt; -0.5: anti-correlated'
     };
 }
 
@@ -418,7 +428,8 @@ function plotSpatial(){
 
     clearTemporalStatsPanel();
 
-    const gene = document.getElementById("spatialGene").value.trim().toLowerCase();
+    const geneInput = document.getElementById("spatialGene").value.trim();
+    const gene = (typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(geneInput) : geneInput).toLowerCase();
 
     const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
     const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
@@ -480,16 +491,16 @@ function plotSpatial(){
     if(traces.length === 2){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'Z-score'};
+        layout.yaxis = {title: 'log2 data'};
         layout.xaxis2 = {title: 'Group'};
-        layout.yaxis2 = {title: 'Z-score'};
+        layout.yaxis2 = {title: 'log2 data'};
         traces[0].xaxis = 'x';
         traces[0].yaxis = 'y';
         traces[1].xaxis = 'x2';
         traces[1].yaxis = 'y2';
     } else {
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'Z-score'};
+        layout.yaxis = {title: 'log2 data'};
     }
 
     plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
@@ -900,7 +911,8 @@ function plotTemporal(){
         return;
     }
 
-    const gene = document.getElementById("temporalGene").value.trim().toLowerCase();
+    const geneInput = document.getElementById("temporalGene").value.trim();
+    const gene = (typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(geneInput) : geneInput).toLowerCase();
     setCurrentPlotMetadata({
         modality: "spatiotemporal",
         view: "single-gene",
@@ -1160,7 +1172,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         goName: plotContext.goName || ""
     });
 
-    const toZScore = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
+    const toSpatialValue = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
     const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
 
     const entries = [];
@@ -1176,8 +1188,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         const geneKey = String(rnaGene[0]?.ID || protGene[0]?.ID || gene).toLowerCase();
         if(!passesDeFilter(geneKey, deStatus, differentialSet)) return;
 
-        const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
-        const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
+        const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toSpatialValue).filter(v => !Number.isNaN(v)));
+        const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toSpatialValue).filter(v => !Number.isNaN(v)));
         const posteriorValues = [posteriorRNA, posteriorProt].filter(v => !Number.isNaN(v));
         const posteriorSort = posteriorValues.length > 0 ? mean(posteriorValues) : Number.NEGATIVE_INFINITY;
 
@@ -1233,14 +1245,14 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         : [...groups];
 
     const getMeanByGroup = (rows, group) => {
-        const vals = rows.filter(d => d.group === group).map(toZScore).filter(v => !Number.isNaN(v));
+        const vals = rows.filter(d => d.group === group).map(toSpatialValue).filter(v => !Number.isNaN(v));
         return mean(vals);
     };
 
     const getReplicateValue = (rows, group, repIndex) => {
         const vals = rows
             .filter(d => d.group === group)
-            .map(toZScore)
+            .map(toSpatialValue)
             .filter(v => !Number.isNaN(v));
         return repIndex < vals.length ? vals[repIndex] : NaN;
     };
@@ -1260,10 +1272,12 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         });
     };
 
+    const buildZScoreRow = (rows) => zscoreRow(buildRow(rows));
+
     let orderedEntries = entries;
     let clusterTree = null;
     if((clusterMode === "rna" || clusterMode === "protein") && entries.length > 1){
-        const clusterRows = entries.map(e => buildRow(clusterMode === "rna" ? e.rnaGene : e.protGene));
+        const clusterRows = entries.map(e => buildZScoreRow(clusterMode === "rna" ? e.rnaGene : e.protGene));
         const hasClusterValues = clusterRows.some(row => row.some(value => Number.isFinite(value)));
         if(hasClusterValues){
             const tree = buildHierarchicalClusterTree(clusterRows);
@@ -1276,8 +1290,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
 
     const geneLabels = orderedEntries.map(e => e.label);
     const rowPositions = geneLabels.map((_, index) => index);
-    const matrixRNA = orderedEntries.map(e => buildRow(e.rnaGene));
-    const matrixProt = orderedEntries.map(e => buildRow(e.protGene));
+    const matrixRNA = orderedEntries.map(e => buildZScoreRow(e.rnaGene));
+    const matrixProt = orderedEntries.map(e => buildZScoreRow(e.protGene));
     const matrixRho = orderedEntries.map(e => [e.rhoValue]);
     const rhoText = orderedEntries.map(e => [Number.isFinite(e.rhoValue) ? e.rhoValue.toFixed(2) : ""]);
 
@@ -1401,9 +1415,9 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             xpad: 0,
             ypad: 0,
             outlinewidth: 0,
-            tickmode: isRhoPanel ? 'array' : undefined,
-            tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : undefined,
-            ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : undefined
+            tickmode: isRhoPanel ? 'array' : 'array',
+            tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : [-2, -1, 0, 1, 2],
+            ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : ['-2', '-1', '0', '1', '2']
         };
     };
 
@@ -2887,7 +2901,10 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             y: -0.01,
             yanchor: 'top',
             len: Math.max(0.08, width * 0.9),
-            thickness: 8
+            thickness: 8,
+            tickmode: titleText === 'Z-score' ? 'array' : undefined,
+            tickvals: titleText === 'Z-score' ? [-2, -1, 0, 1, 2] : undefined,
+            ticktext: titleText === 'Z-score' ? ['-2', '-1', '0', '1', '2'] : undefined
         };
     };
 

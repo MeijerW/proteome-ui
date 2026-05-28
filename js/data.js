@@ -5,12 +5,104 @@ let RNA_DATA = []
 let PROT_DATA = []
 let RHO_CORRELATION_DATA = new Map()
 let DIFFERENTIALLY_EXPRESSED_GENES = new Set()
+let ALIAS_MAP = new Map()
+let CANONICAL_TO_ALIASES = new Map()
 
 const SPATIAL_DATASETS = {
-    RNA: "rna_zscore_long.csv",
-    PROTEIN: "prot_zscore_long.csv",
-    RHO: "correlation_eachprot_RNAnew.txt",
-    DE_LIST: "heatmap_order_20260326.txt"
+    RNA: ["rna_long_harmonized_20260528.csv"],
+    PROTEIN: ["prot_long_harmonized_20260528.csv"],
+    RHO: ["correlation_eachprot_RNAnew.txt"],
+    DE_LIST: ["heatmap_order_20260326.txt"],
+    ALIASES: ["master_gene_alias_lookup_spatial+spatiotemporal_20260528.csv"]
+}
+
+function normalizeGeneKey(value){
+    return String(value || "").trim().toLowerCase();
+}
+
+function registerAlias(query, canonical){
+    const queryKey = normalizeGeneKey(query);
+    const canonicalValue = String(canonical || "").trim();
+    if(!queryKey || !canonicalValue) return;
+
+    ALIAS_MAP.set(queryKey, canonicalValue);
+
+    const canonicalKey = normalizeGeneKey(canonicalValue);
+    if(!CANONICAL_TO_ALIASES.has(canonicalKey)){
+        CANONICAL_TO_ALIASES.set(canonicalKey, new Set());
+    }
+    CANONICAL_TO_ALIASES.get(canonicalKey).add(canonicalValue);
+    CANONICAL_TO_ALIASES.get(canonicalKey).add(String(query || "").trim());
+}
+
+function resolveGeneAlias(query){
+    const trimmed = String(query || "").trim();
+    if(!trimmed) return "";
+    const key = normalizeGeneKey(trimmed);
+    return ALIAS_MAP.get(key) || trimmed;
+}
+
+function getAliasAutocompleteList(){
+    const names = new Set();
+    CANONICAL_TO_ALIASES.forEach(aliasSet => {
+        aliasSet.forEach(name => {
+            const clean = String(name || "").trim();
+            if(clean) names.add(clean);
+        });
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function parseAliasCsv(text){
+    const rows = Papa.parse(text, {
+        header: true,
+        dynamicTyping: false,
+        skipEmptyLines: true
+    }).data;
+
+    rows.forEach(row => {
+        const canonical = row.canonical || row.symbol || "";
+        if(!canonical) return;
+
+        registerAlias(canonical, canonical);
+
+        const queryBuckets = [
+            row.query_name,
+            row.query,
+            row.alias,
+            row.aliases,
+            row.aliases_joined,
+            row.all_aliases
+        ];
+
+        queryBuckets.forEach(bucket => {
+            String(bucket || "")
+                .split(/[|,;]+/)
+                .map(value => String(value || "").trim())
+                .filter(Boolean)
+                .forEach(alias => registerAlias(alias, canonical));
+        });
+    });
+}
+
+async function fetchFirstAvailable(candidates, label, required = true){
+    const list = Array.isArray(candidates) ? candidates : [candidates];
+    let lastStatus = "";
+
+    for(const fileName of list){
+        const response = await fetch(BASE + fileName);
+        if(response.ok){
+            const text = await response.text();
+            return {text, fileName};
+        }
+        lastStatus = `HTTP ${response.status}`;
+    }
+
+    if(required){
+        throw new Error(`Failed to load ${label}. Tried: ${list.join(", ")} (${lastStatus || "unavailable"})`);
+    }
+
+    return null;
 }
 
 function cleanQuotedValue(value){
@@ -31,8 +123,13 @@ function parseRhoCorrelationText(text){
         const rhoValue = Number(parts[parts.length - 1]);
         if(!gene || Number.isNaN(rhoValue)) return;
 
+        const canonicalGene = resolveGeneAlias(gene);
         rhoMap.set(gene.toLowerCase(), {
-            gene,
+            gene: canonicalGene,
+            value: rhoValue
+        });
+        rhoMap.set(String(canonicalGene).toLowerCase(), {
+            gene: canonicalGene,
             value: rhoValue
         });
     });
@@ -71,6 +168,8 @@ function parseDifferentialGeneList(text){
 
             if(gene && String(gene).toLowerCase() !== 'x'){
                 genes.add(String(gene).toLowerCase());
+                const canonical = resolveGeneAlias(gene);
+                if(canonical) genes.add(String(canonical).toLowerCase());
             }
         });
     return genes;
@@ -103,7 +202,7 @@ function parseSpatialCsv(text){
     }).data;
 
     return rows.map(row => ({
-        ID: row.Gene || row.ID,
+        ID: resolveGeneAlias(row.Gene || row.gene || row.ID || row.id),
         group: row.group || row.Group || row.region || row.Region,
         sample: row.sample || row.Sample || null,
         replicate: row.replicate || row.Replicate || null,
@@ -113,45 +212,46 @@ function parseSpatialCsv(text){
 
 async function loadData(){
 
+// Load alias mappings first (optional, but enables flexible gene lookup)
+const aliasFile = await fetchFirstAvailable(SPATIAL_DATASETS.ALIASES, "alias lookup", false)
+if(aliasFile && aliasFile.text){
+parseAliasCsv(aliasFile.text)
+}
+
 // Load pre-z-scored spatial data from CSV
-const rnaCsv = await fetch(BASE + SPATIAL_DATASETS.RNA)
-if(!rnaCsv.ok){
-throw new Error(`Failed to load ${SPATIAL_DATASETS.RNA}: HTTP ${rnaCsv.status}`)
-}
-const rnaCsvText = await rnaCsv.text()
-RNA_DATA = parseSpatialCsv(rnaCsvText)
+const rnaCsv = await fetchFirstAvailable(SPATIAL_DATASETS.RNA, "spatial RNA CSV")
+RNA_DATA = parseSpatialCsv(rnaCsv.text)
 
-const protCsv = await fetch(BASE + SPATIAL_DATASETS.PROTEIN)
-if(!protCsv.ok){
-throw new Error(`Failed to load ${SPATIAL_DATASETS.PROTEIN}: HTTP ${protCsv.status}`)
-}
-const protCsvText = await protCsv.text()
-PROT_DATA = parseSpatialCsv(protCsvText)
+const protCsv = await fetchFirstAvailable(SPATIAL_DATASETS.PROTEIN, "spatial protein CSV")
+PROT_DATA = parseSpatialCsv(protCsv.text)
 
-const rhoFile = await fetch(BASE + SPATIAL_DATASETS.RHO)
-if(!rhoFile.ok){
-throw new Error(`Failed to load ${SPATIAL_DATASETS.RHO}: HTTP ${rhoFile.status}`)
-}
-const rhoText = await rhoFile.text()
+const rhoFile = await fetchFirstAvailable(SPATIAL_DATASETS.RHO, "spatial rho file")
+const rhoText = rhoFile.text
 RHO_CORRELATION_DATA = parseRhoCorrelationText(rhoText)
 
-const deFile = await fetch(BASE + SPATIAL_DATASETS.DE_LIST)
-if(!deFile.ok){
-throw new Error(`Failed to load ${SPATIAL_DATASETS.DE_LIST}: HTTP ${deFile.status}`)
-}
-const deText = await deFile.text()
+const deFile = await fetchFirstAvailable(SPATIAL_DATASETS.DE_LIST, "DE gene list")
+const deText = deFile.text
 DIFFERENTIALLY_EXPRESSED_GENES = parseDifferentialGeneList(deText)
 
 // Load spatiotemporal data from TSV and add
 const rnaFiles = [
-    {url: "A_log2_tranformed_cleaned.tsv", region: "a-psm"},
-    {url: "P_log2_tranformed_cleaned.tsv", region: "p-psm"},
-    {url: "S_log2_tranformed_cleaned.tsv", region: "Somite"}
+    {
+        urls: ["A_RNASeq_log2_tranformed_cleaned_harmonized_20260528.tsv"],
+        region: "a-psm"
+    },
+    {
+        urls: ["P_RNASeq_log2_tranformed_cleaned_harmonized_20260528.tsv"],
+        region: "p-psm"
+    },
+    {
+        urls: ["S_RNASeq_log2_tranformed_cleaned_harmonized_20260528.tsv"],
+        region: "Somite"
+    }
 ]
 
 for (const file of rnaFiles) {
-    const response = await fetch(BASE + file.url)
-    const text = await response.text()
+    const loaded = await fetchFirstAvailable(file.urls, `spatiotemporal RNA ${file.region}`)
+    const text = loaded.text
     const data = Papa.parse(text, {
         header: true,
         dynamicTyping: true,
@@ -167,7 +267,7 @@ for (const file of rnaFiles) {
                 const value = row[key];
                 if (value !== undefined && value !== null) {
                     RNA_DATA.push({
-                        ID: row.ID,
+                        ID: resolveGeneAlias(row.ID || row.Gene || row.gene),
                         region: file.region,
                         group: file.region,
                         time: time,
@@ -190,14 +290,23 @@ for (const file of rnaFiles) {
 
 // Protein files
 const protFiles = [
-    {url: "spatialtemporal_depA_norm_cleaned.tsv", region: "a-psm"},
-    {url: "spatialtemporal_depP_norm_cleaned.tsv", region: "p-psm"},
-    {url: "spatialtemporal_depS_norm_cleaned.tsv", region: "Somite"}
+    {
+        urls: ["A_Proteomics_spatialtemporal_depA_norm_cleaned_harmonized_20260528.tsv"],
+        region: "a-psm"
+    },
+    {
+        urls: ["P_Proteomics_spatialtemporal_depP_norm_cleaned_harmonized_20260528.tsv"],
+        region: "p-psm"
+    },
+    {
+        urls: ["S_Proteomics_spatialtemporal_depS_norm_cleaned_harmonized_20260528.tsv"],
+        region: "Somite"
+    }
 ]
 
 for (const file of protFiles) {
-    const response = await fetch(BASE + file.url)
-    const text = await response.text()
+    const loaded = await fetchFirstAvailable(file.urls, `spatiotemporal protein ${file.region}`)
+    const text = loaded.text
     const data = Papa.parse(text, {
         header: true,
         dynamicTyping: true,
@@ -213,7 +322,7 @@ for (const file of protFiles) {
                 const value = row[key];
                 if (value !== undefined && value !== null) {
                     PROT_DATA.push({
-                        ID: row.ID,
+                        ID: resolveGeneAlias(row.ID || row.Gene || row.gene),
                         region: file.region,
                         group: file.region,
                         time: time,
@@ -239,3 +348,6 @@ document.dispatchEvent(new CustomEvent("proteomeDataLoaded"))
 }
 
 loadData()
+
+window.resolveGeneAlias = resolveGeneAlias;
+window.getAliasAutocompleteList = getAliasAutocompleteList;
