@@ -773,7 +773,7 @@ footer {
 
 .home-hero-inner {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.2fr 0.8fr;
     max-width: 1200px;
     margin: 0 auto;
     padding: 50px 40px 60px;
@@ -834,15 +834,16 @@ footer {
 .home-hero-right {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
 }
 
-.home-hero-right .infographic-placeholder {
-    background: rgba(255,255,255,0.08);
-    border: 2px dashed rgba(255,255,255,0.3);
+.home-hero-graphic {
     border-radius: 12px;
-    width: 100%;
-    aspect-ratio: 4 / 3;
+    width: 94%;
+    max-width: 470px;
+    height: auto;
+    display: block;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
 }
 
 /* Info section */
@@ -1045,6 +1046,10 @@ footer {
 
     .home-hero-sub {
         font-size: 1.15rem;
+    }
+
+    .home-hero-graphic {
+        max-width: 100%;
     }
 
     .home-how-inner {
