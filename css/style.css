@@ -970,7 +970,7 @@ footer {
 
 .home-tabs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 28px;
     text-align: left;
 }
@@ -1031,6 +1031,12 @@ footer {
 }
 
 /* Responsive */
+
+@media (max-width: 1200px) {
+    .home-tabs-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
 
 @media (max-width: 900px) {
     .home-hero-inner,
