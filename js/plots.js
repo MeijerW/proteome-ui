@@ -131,6 +131,7 @@ function parseGeneInput(input){
         .map(token => token.trim())
         .map(token => token.replace(/^["']+|["']+$/g, ""))
         .filter(token => token.length > 0)
+        .map(token => typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(token) : token)
         .map(token => token.toLowerCase());
 
     return Array.from(new Set(tokens));
@@ -192,7 +193,16 @@ function restorePlotStateForView(viewKey){
 
 function getSpatialCorrelationEntry(gene){
     if(!gene || typeof RHO_CORRELATION_DATA === "undefined" || !(RHO_CORRELATION_DATA instanceof Map)) return null;
-    return RHO_CORRELATION_DATA.get(String(gene).trim().toLowerCase()) || null;
+    const trimmed = String(gene).trim();
+    const direct = RHO_CORRELATION_DATA.get(trimmed.toLowerCase());
+    if(direct) return direct;
+
+    if(typeof window.resolveGeneAlias === "function"){
+        const canonical = String(window.resolveGeneAlias(trimmed) || "").trim().toLowerCase();
+        if(canonical) return RHO_CORRELATION_DATA.get(canonical) || null;
+    }
+
+    return null;
 }
 
 function getSpatialCorrelationValue(gene){
@@ -226,7 +236,7 @@ function buildSpatialCorrelationGuideAnnotation({ x = 1.02, y = 1.0, xanchor = '
         borderwidth: 1,
         borderpad: 8,
         font: {size: 11, color: '#40362e'},
-        text: '<b>Rho guide</b><br>rho &gt; 0.5: highly correlated<br>-0.5 ≤ rho ≤ 0.5: lowly correlated<br>rho &lt; -0.5: anti-correlated'
+        text: '<b>Rho guide</b><br>rho &gt; 0.5: highly correlated<br>-0.5 <= rho <= 0.5: lowly correlated<br>rho &lt; -0.5: anti-correlated'
     };
 }
 
@@ -418,7 +428,8 @@ function plotSpatial(){
 
     clearTemporalStatsPanel();
 
-    const gene = document.getElementById("spatialGene").value.trim().toLowerCase();
+    const geneInput = document.getElementById("spatialGene").value.trim();
+    const gene = (typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(geneInput) : geneInput).toLowerCase();
 
     const rnaGene = RNA_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
     const protGene = PROT_DATA.filter(d => d.ID && String(d.ID).toLowerCase() === gene && !d.time);
@@ -480,16 +491,16 @@ function plotSpatial(){
     if(traces.length === 2){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'Z-score'};
+        layout.yaxis = {title: 'log2 data'};
         layout.xaxis2 = {title: 'Group'};
-        layout.yaxis2 = {title: 'Z-score'};
+        layout.yaxis2 = {title: 'log2 data'};
         traces[0].xaxis = 'x';
         traces[0].yaxis = 'y';
         traces[1].xaxis = 'x2';
         traces[1].yaxis = 'y2';
     } else {
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'Z-score'};
+        layout.yaxis = {title: 'log2 data'};
     }
 
     plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
@@ -563,8 +574,255 @@ function getAggregationMode(modeId){
     return node ? node.value : "average";
 }
 
+function getSpatialClusterMode(modeId){
+    const node = document.getElementById(modeId);
+    const mode = node ? String(node.value || "none").toLowerCase() : "none";
+    if(mode === "rna" || mode === "protein") return mode;
+    if(mode === "posterior_rna_desc" || mode === "posterior_protein_desc") return mode;
+    return "none";
+}
+
+function imputeMissingForClustering(row){
+    const numeric = row.filter(v => Number.isFinite(v));
+    if(numeric.length === 0){
+        return row.map(() => 0);
+    }
+    const mean = numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+    return row.map(v => Number.isFinite(v) ? v : mean);
+}
+
+function buildHierarchicalClusterOrder(matrix){
+    const rowCount = Array.isArray(matrix) ? matrix.length : 0;
+    if(rowCount <= 1) return Array.from({length: rowCount}, (_, idx) => idx);
+
+    const vectors = matrix.map(row => imputeMissingForClustering(Array.isArray(row) ? row : []));
+    const rowDistance = Array.from({length: rowCount}, () => Array(rowCount).fill(0));
+
+    for(let i = 0; i < rowCount; i++){
+        for(let j = i + 1; j < rowCount; j++){
+            const a = vectors[i];
+            const b = vectors[j];
+            const len = Math.max(a.length, b.length);
+            let sumSq = 0;
+            for(let k = 0; k < len; k++){
+                const av = Number.isFinite(a[k]) ? a[k] : 0;
+                const bv = Number.isFinite(b[k]) ? b[k] : 0;
+                const diff = av - bv;
+                sumSq += diff * diff;
+            }
+            const dist = Math.sqrt(sumSq);
+            rowDistance[i][j] = dist;
+            rowDistance[j][i] = dist;
+        }
+    }
+
+    const avgLinkageDistance = (indicesA, indicesB) => {
+        let sum = 0;
+        let count = 0;
+        indicesA.forEach(a => {
+            indicesB.forEach(b => {
+                sum += rowDistance[a][b];
+                count += 1;
+            });
+        });
+        return count === 0 ? Number.POSITIVE_INFINITY : (sum / count);
+    };
+
+    const edgeDistance = (leftOrder, rightOrder) => {
+        const leftTail = leftOrder[leftOrder.length - 1];
+        const rightHead = rightOrder[0];
+        return rowDistance[leftTail][rightHead];
+    };
+
+    let clusters = Array.from({length: rowCount}, (_, idx) => ({
+        indices: [idx],
+        order: [idx]
+    }));
+
+    while(clusters.length > 1){
+        let bestI = 0;
+        let bestJ = 1;
+        let bestDist = Number.POSITIVE_INFINITY;
+
+        for(let i = 0; i < clusters.length; i++){
+            for(let j = i + 1; j < clusters.length; j++){
+                const dist = avgLinkageDistance(clusters[i].indices, clusters[j].indices);
+                if(dist < bestDist){
+                    bestDist = dist;
+                    bestI = i;
+                    bestJ = j;
+                }
+            }
+        }
+
+        const clusterA = clusters[bestI];
+        const clusterB = clusters[bestJ];
+        const orderAB = clusterA.order.concat(clusterB.order);
+        const orderBA = clusterB.order.concat(clusterA.order);
+
+        const mergedOrder = edgeDistance(clusterA.order, clusterB.order) <= edgeDistance(clusterB.order, clusterA.order)
+            ? orderAB
+            : orderBA;
+
+        const merged = {
+            indices: clusterA.indices.concat(clusterB.indices),
+            order: mergedOrder
+        };
+
+        clusters = clusters.filter((_, idx) => idx !== bestI && idx !== bestJ);
+        clusters.push(merged);
+    }
+
+    return clusters[0].order;
+}
+
+function buildHierarchicalClusterTree(matrix){
+    const rowCount = Array.isArray(matrix) ? matrix.length : 0;
+    if(rowCount === 0){
+        return {
+            order: [],
+            root: null,
+            maxHeight: 0
+        };
+    }
+
+    if(rowCount === 1){
+        return {
+            order: [0],
+            root: {leaf: 0, height: 0},
+            maxHeight: 0
+        };
+    }
+
+    const vectors = matrix.map(row => imputeMissingForClustering(Array.isArray(row) ? row : []));
+    const rowDistance = Array.from({length: rowCount}, () => Array(rowCount).fill(0));
+
+    for(let i = 0; i < rowCount; i++){
+        for(let j = i + 1; j < rowCount; j++){
+            const a = vectors[i];
+            const b = vectors[j];
+            const len = Math.max(a.length, b.length);
+            let sumSq = 0;
+            for(let k = 0; k < len; k++){
+                const av = Number.isFinite(a[k]) ? a[k] : 0;
+                const bv = Number.isFinite(b[k]) ? b[k] : 0;
+                const diff = av - bv;
+                sumSq += diff * diff;
+            }
+            const dist = Math.sqrt(sumSq);
+            rowDistance[i][j] = dist;
+            rowDistance[j][i] = dist;
+        }
+    }
+
+    const avgLinkageDistance = (indicesA, indicesB) => {
+        let sum = 0;
+        let count = 0;
+        indicesA.forEach(a => {
+            indicesB.forEach(b => {
+                sum += rowDistance[a][b];
+                count += 1;
+            });
+        });
+        return count === 0 ? Number.POSITIVE_INFINITY : (sum / count);
+    };
+
+    const edgeDistance = (leftOrder, rightOrder) => {
+        const leftTail = leftOrder[leftOrder.length - 1];
+        const rightHead = rightOrder[0];
+        return rowDistance[leftTail][rightHead];
+    };
+
+    let clusters = Array.from({length: rowCount}, (_, idx) => ({
+        indices: [idx],
+        order: [idx],
+        node: {
+            leaf: idx,
+            height: 0
+        }
+    }));
+
+    let maxHeight = 0;
+
+    while(clusters.length > 1){
+        let bestI = 0;
+        let bestJ = 1;
+        let bestDist = Number.POSITIVE_INFINITY;
+
+        for(let i = 0; i < clusters.length; i++){
+            for(let j = i + 1; j < clusters.length; j++){
+                const dist = avgLinkageDistance(clusters[i].indices, clusters[j].indices);
+                if(dist < bestDist){
+                    bestDist = dist;
+                    bestI = i;
+                    bestJ = j;
+                }
+            }
+        }
+
+        const clusterA = clusters[bestI];
+        const clusterB = clusters[bestJ];
+        const useAB = edgeDistance(clusterA.order, clusterB.order) <= edgeDistance(clusterB.order, clusterA.order);
+
+        const mergedOrder = useAB
+            ? clusterA.order.concat(clusterB.order)
+            : clusterB.order.concat(clusterA.order);
+
+        const leftNode = useAB ? clusterA.node : clusterB.node;
+        const rightNode = useAB ? clusterB.node : clusterA.node;
+        const height = Number.isFinite(bestDist) ? bestDist : 0;
+        if(height > maxHeight) maxHeight = height;
+
+        const merged = {
+            indices: clusterA.indices.concat(clusterB.indices),
+            order: mergedOrder,
+            node: {
+                left: leftNode,
+                right: rightNode,
+                height
+            }
+        };
+
+        clusters = clusters.filter((_, idx) => idx !== bestI && idx !== bestJ);
+        clusters.push(merged);
+    }
+
+    return {
+        order: clusters[0].order,
+        root: clusters[0].node,
+        maxHeight
+    };
+}
+
 function getSelectedTemporalMetrics(selector = ".temporal-metric-checkbox"){ 
     return Array.from(document.querySelectorAll(`${selector}:checked`)).map(cb => cb.value);
+}
+
+function getTemporalSortConfig(datasetId, metricId, orderId){
+    const datasetRaw = String(document.getElementById(datasetId)?.value || 'rna').toLowerCase();
+    const metricRaw = String(document.getElementById(metricId)?.value || 'LAG').toUpperCase();
+    const orderRaw = String(document.getElementById(orderId)?.value || 'asc').toLowerCase();
+
+    return {
+        dataset: datasetRaw === 'protein' ? 'protein' : 'rna',
+        metric: TEMPORAL_META_FIELDS.includes(metricRaw) ? metricRaw : 'LAG',
+        order: orderRaw === 'desc' ? 'desc' : 'asc'
+    };
+}
+
+function getRowMetricValue(rows, metric){
+    if(!Array.isArray(rows) || rows.length === 0) return NaN;
+    for(const row of rows){
+        const value = Number(row[metric]);
+        if(!Number.isNaN(value)) return value;
+    }
+    return NaN;
+}
+
+function getTemporalSortValue(entry, sortConfig){
+    const metric = TEMPORAL_META_FIELDS.includes(sortConfig?.metric) ? sortConfig.metric : 'LAG';
+    if(sortConfig?.dataset === 'protein') return getRowMetricValue(entry.protGene, metric);
+    return getRowMetricValue(entry.rnaGene, metric);
 }
 
 function extractTemporalValueByAggregation(geneRows, time, aggregationMode, sampleKey){
@@ -653,7 +911,8 @@ function plotTemporal(){
         return;
     }
 
-    const gene = document.getElementById("temporalGene").value.trim().toLowerCase();
+    const geneInput = document.getElementById("temporalGene").value.trim();
+    const gene = (typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(geneInput) : geneInput).toLowerCase();
     setCurrentPlotMetadata({
         modality: "spatiotemporal",
         view: "single-gene",
@@ -894,7 +1153,16 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const groups = ['Posterior', 'Anterior', 'Somite'];
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("spatialGeneMembership");
     const aggregationMode = optionsOverride?.aggregationMode || getAggregationMode("spatialAggregation");
+    const deStatus = optionsOverride?.deStatus || (document.getElementById("spatialDeStatus")?.value || "all");
+    const clusterMode = optionsOverride?.clusterMode || getSpatialClusterMode("spatialClusterMode");
     const plotContext = optionsOverride?.plotContext || {};
+    const differentialSet = getDifferentialGeneSet();
+    const deListRequiredButMissing = (deStatus === "de" || deStatus === "nonde") && differentialSet.size === 0;
+
+    if(deListRequiredButMissing){
+        alert("Differential-expression gene list was not loaded. Check the DE list filename in data loading configuration.");
+        return;
+    }
     setCurrentPlotMetadata({
         modality: "spatial",
         view: "heatmap",
@@ -904,7 +1172,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         goName: plotContext.goName || ""
     });
 
-    const toZScore = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
+    const toSpatialValue = (row) => Number.isFinite(row.spatialValue) ? row.spatialValue : NaN;
     const mean = (vals) => vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : NaN;
 
     const entries = [];
@@ -917,8 +1185,11 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         if(!hasRna && !hasProt) return;
         if(membershipMode === "both" && !(hasRna && hasProt)) return;
 
-        const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
-        const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toZScore).filter(v => !Number.isNaN(v)));
+        const geneKey = String(rnaGene[0]?.ID || protGene[0]?.ID || gene).toLowerCase();
+        if(!passesDeFilter(geneKey, deStatus, differentialSet)) return;
+
+        const posteriorRNA = mean(rnaGene.filter(d => d.group === 'Posterior').map(toSpatialValue).filter(v => !Number.isNaN(v)));
+        const posteriorProt = mean(protGene.filter(d => d.group === 'Posterior').map(toSpatialValue).filter(v => !Number.isNaN(v)));
         const posteriorValues = [posteriorRNA, posteriorProt].filter(v => !Number.isNaN(v));
         const posteriorSort = posteriorValues.length > 0 ? mean(posteriorValues) : Number.NEGATIVE_INFINITY;
 
@@ -926,12 +1197,32 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             label: rnaGene[0]?.ID || protGene[0]?.ID,
             rnaGene,
             protGene,
+            posteriorRNA,
+            posteriorProt,
             posteriorSort,
             rhoValue: getSpatialCorrelationValue(rnaGene[0]?.ID || protGene[0]?.ID || gene)
         });
     });
 
-    entries.sort((a, b) => b.posteriorSort - a.posteriorSort);
+    if(clusterMode === "posterior_rna_desc"){
+        entries.sort((a, b) => {
+            const av = Number.isFinite(a.posteriorRNA) ? a.posteriorRNA : Number.NEGATIVE_INFINITY;
+            const bv = Number.isFinite(b.posteriorRNA) ? b.posteriorRNA : Number.NEGATIVE_INFINITY;
+            if(bv !== av) return bv - av;
+            return (Number.isFinite(b.posteriorSort) ? b.posteriorSort : Number.NEGATIVE_INFINITY)
+                - (Number.isFinite(a.posteriorSort) ? a.posteriorSort : Number.NEGATIVE_INFINITY);
+        });
+    } else if(clusterMode === "posterior_protein_desc"){
+        entries.sort((a, b) => {
+            const av = Number.isFinite(a.posteriorProt) ? a.posteriorProt : Number.NEGATIVE_INFINITY;
+            const bv = Number.isFinite(b.posteriorProt) ? b.posteriorProt : Number.NEGATIVE_INFINITY;
+            if(bv !== av) return bv - av;
+            return (Number.isFinite(b.posteriorSort) ? b.posteriorSort : Number.NEGATIVE_INFINITY)
+                - (Number.isFinite(a.posteriorSort) ? a.posteriorSort : Number.NEGATIVE_INFINITY);
+        });
+    } else {
+        entries.sort((a, b) => b.posteriorSort - a.posteriorSort);
+    }
 
     // Spatial CSV rows do not carry explicit sample IDs. In sample mode we therefore
     // expose the original per-group values by replicate slot (REP_1..REP_n).
@@ -954,14 +1245,14 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         : [...groups];
 
     const getMeanByGroup = (rows, group) => {
-        const vals = rows.filter(d => d.group === group).map(toZScore).filter(v => !Number.isNaN(v));
+        const vals = rows.filter(d => d.group === group).map(toSpatialValue).filter(v => !Number.isNaN(v));
         return mean(vals);
     };
 
     const getReplicateValue = (rows, group, repIndex) => {
         const vals = rows
             .filter(d => d.group === group)
-            .map(toZScore)
+            .map(toSpatialValue)
             .filter(v => !Number.isNaN(v));
         return repIndex < vals.length ? vals[repIndex] : NaN;
     };
@@ -981,11 +1272,28 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         });
     };
 
-    const geneLabels = entries.map(e => e.label);
-    const matrixRNA = entries.map(e => buildRow(e.rnaGene));
-    const matrixProt = entries.map(e => buildRow(e.protGene));
-    const matrixRho = entries.map(e => [e.rhoValue]);
-    const rhoText = entries.map(e => [Number.isFinite(e.rhoValue) ? e.rhoValue.toFixed(2) : ""]);
+    const buildZScoreRow = (rows) => zscoreRow(buildRow(rows));
+
+    let orderedEntries = entries;
+    let clusterTree = null;
+    if((clusterMode === "rna" || clusterMode === "protein") && entries.length > 1){
+        const clusterRows = entries.map(e => buildZScoreRow(clusterMode === "rna" ? e.rnaGene : e.protGene));
+        const hasClusterValues = clusterRows.some(row => row.some(value => Number.isFinite(value)));
+        if(hasClusterValues){
+            const tree = buildHierarchicalClusterTree(clusterRows);
+            if(Array.isArray(tree.order) && tree.order.length === entries.length){
+                orderedEntries = tree.order.map(index => entries[index]);
+                clusterTree = tree;
+            }
+        }
+    }
+
+    const geneLabels = orderedEntries.map(e => e.label);
+    const rowPositions = geneLabels.map((_, index) => index);
+    const matrixRNA = orderedEntries.map(e => buildZScoreRow(e.rnaGene));
+    const matrixProt = orderedEntries.map(e => buildZScoreRow(e.protGene));
+    const matrixRho = orderedEntries.map(e => [e.rhoValue]);
+    const rhoText = orderedEntries.map(e => [Number.isFinite(e.rhoValue) ? e.rhoValue.toFixed(2) : ""]);
 
     if(matrixRNA.length === 0 && matrixProt.length === 0){
         alert(membershipMode === "both"
@@ -997,24 +1305,32 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const heatmapHeight = Math.max(600, 180 + (geneLabels.length * 16));
     const yTickFontSize = geneLabels.length > 250 ? 8 : (geneLabels.length > 120 ? 9 : 10);
     const yAxisBase = {
-        title: 'Genes',
-        type: 'category',
+        title: '',
+        type: 'linear',
+        autorange: 'reversed',
         automargin: true,
         tickmode: 'array',
-        tickvals: geneLabels,
+        tickvals: rowPositions,
         ticktext: geneLabels,
         tickfont: {size: yTickFontSize},
         ticks: '',
         ticklen: 0
     };
 
+    const showDendrogram = !!(clusterTree && clusterTree.root && (clusterMode === 'rna' || clusterMode === 'protein'));
     const panels = [];
+    if(showDendrogram){
+        panels.push({
+            title: clusterMode === 'rna' ? 'RNA dendrogram' : 'Protein dendrogram',
+            panelKind: 'dendrogram'
+        });
+    }
     if(matrixRNA.some(row => row.some(v => !isNaN(v)))){
         panels.push({
             title: "RNA",
             z: matrixRNA,
             x: xLabels,
-            y: geneLabels,
+            y: rowPositions,
             type: "heatmap",
             panelKind: 'expr'
         });
@@ -1024,50 +1340,57 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             title: "Protein",
             z: matrixProt,
             x: xLabels,
-            y: geneLabels,
+            y: rowPositions,
             type: "heatmap",
             panelKind: 'expr'
         });
     }
-    if(matrixRho.some(row => row.some(v => !isNaN(v)))){
-        panels.push({
-            title: "Rho correlation",
-            z: matrixRho,
-            x: ['Rho'],
-            y: geneLabels,
-            type: "heatmap",
-            panelKind: 'rho',
-            text: rhoText,
-            texttemplate: '%{text}',
-            textfont: {size: Math.max(8, Math.min(12, yTickFontSize + 1))},
-            hovertemplate: 'Gene: %{y}<br>Rho: %{z:.4f}<extra></extra>'
-        });
-    }
+    panels.push({
+        title: "Rho correlation",
+        z: matrixRho,
+        x: ['Rho'],
+        y: rowPositions,
+        type: "heatmap",
+        panelKind: 'rho',
+        text: rhoText,
+        texttemplate: '%{text}',
+        textfont: {size: Math.max(8, Math.min(12, yTickFontSize + 1))},
+        customdata: orderedEntries.map(e => [e.label]),
+        hovertemplate: 'Gene: %{customdata[0]}<br>Rho: %{z:.4f}<extra></extra>'
+    });
 
     const customPlotTitle = optionsOverride?.plotTitle;
-    const titleText = customPlotTitle || "Spatial Expression Heatmap";
+    const clusteringLabel = clusterMode === "rna"
+        ? "Clustered by RNA"
+        : clusterMode === "protein"
+            ? "Clustered by Protein"
+            : clusterMode === "posterior_rna_desc"
+                ? "Posterior RNA high to low"
+                : clusterMode === "posterior_protein_desc"
+                    ? "Posterior Protein high to low"
+                    : "";
+    const titleBase = customPlotTitle || "Spatial Expression Heatmap";
+    const titleText = clusteringLabel ? `${titleBase} - ${clusteringLabel}` : titleBase;
     const hasRhoPanel = panels.some(panel => panel.panelKind === 'rho');
+    const hasDendrogramPanel = panels.some(panel => panel.panelKind === 'dendrogram');
     const panelDomains = (() => {
         if(panels.length === 0) return [];
 
-        if(!hasRhoPanel){
-            const gap = panels.length > 1 ? 0.04 : 0;
-            const width = (1 - (gap * (panels.length - 1))) / panels.length;
-            return panels.map((_, index) => {
-                const start = index * (width + gap);
-                return [start, start + width];
-            });
-        }
-
-        const gap = panels.length > 1 ? 0.035 : 0;
-        const rhoWidth = 0.10;
-        const nonRhoCount = panels.filter(panel => panel.panelKind !== 'rho').length;
-        const remainingWidth = 1 - rhoWidth - (gap * (panels.length - 1));
-        const mainWidth = nonRhoCount > 0 ? remainingWidth / nonRhoCount : remainingWidth;
+        const gap = panels.length > 1 ? 0.03 : 0;
+        const totalGap = gap * Math.max(0, panels.length - 1);
+        const rhoWidth = hasRhoPanel ? 0.10 : 0;
+        const dendrogramWidth = hasDendrogramPanel ? 0.14 : 0;
+        const flexibleCount = panels.filter(panel => panel.panelKind === 'expr').length;
+        const remainingWidth = Math.max(0.1, 1 - totalGap - rhoWidth - dendrogramWidth);
+        const exprWidth = flexibleCount > 0 ? remainingWidth / flexibleCount : remainingWidth;
 
         let currentStart = 0;
         return panels.map(panel => {
-            const width = panel.panelKind === 'rho' ? rhoWidth : mainWidth;
+            const width = panel.panelKind === 'rho'
+                ? rhoWidth
+                : panel.panelKind === 'dendrogram'
+                    ? dendrogramWidth
+                    : exprWidth;
             const domain = [currentStart, currentStart + width];
             currentStart += width + gap;
             return domain;
@@ -1085,22 +1408,27 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             xanchor: 'center',
             y: -0.01,
             yanchor: 'top',
-            len: Math.max(0.08, width * 0.9),
+            len: width,
+            lenmode: 'fraction',
             thickness: 10,
-            tickmode: isRhoPanel ? 'array' : undefined,
-            tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : undefined,
-            ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : undefined
+            thicknessmode: 'pixels',
+            xpad: 0,
+            ypad: 0,
+            outlinewidth: 0,
+            tickmode: isRhoPanel ? 'array' : 'array',
+            tickvals: isRhoPanel ? [-1, -0.5, 0, 0.5, 1] : [-2, -1, 0, 1, 2],
+            ticktext: isRhoPanel ? ['-1', '-0.5', '0', '0.5', '1'] : ['-2', '-1', '0', '1', '2']
         };
     };
 
-    const stripColumnGap = hasRhoPanel ? 0.035 : (panels.length > 1 ? 0.04 : 0);
+    const stripColumnGap = panels.length > 1 ? 0.03 : 0;
 
     setCurrentPlotMetadata({
         headerStrip: {
             kind: 'spatial-expression',
             title: titleText,
-            leftMargin: 220,
-            rightMargin: 40,
+            leftMargin: hasDendrogramPanel ? 120 : 110,
+            rightMargin: 220,
             columnGap: stripColumnGap,
             rowLabels: ['p-PSM', 'a-PSM', 'Somite'],
             columns: panels.map(panel => ({
@@ -1115,7 +1443,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const layout = {
         title: '',
         height: heatmapHeight,
-        margin: {l: 220, r: 40, t: 90, b: hasRhoPanel ? 110 : 100},
+        margin: {l: hasDendrogramPanel ? 120 : 110, r: 280, t: 90, b: hasRhoPanel ? 110 : 100},
         annotations: []
     };
 
@@ -1123,23 +1451,39 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         layout.annotations.push(buildSpatialCorrelationGuideAnnotation({x: 0.86, y: -0.33, xanchor: 'center'}));
     }
 
-    const data = panels.map((panel, index) => {
+    const rightLabelPanelIndex = panels.findIndex(panel => panel.panelKind === 'rho');
+
+    const data = [];
+    panels.forEach((panel, index) => {
         const axisSuffix = index === 0 ? '' : String(index + 1);
         const xAxisName = `xaxis${axisSuffix}`;
         const yAxisName = `yaxis${axisSuffix}`;
-        const tickAngle = panel.panelKind === 'rho' ? 0 : (aggregationMode === "samples" ? -45 : 0);
+        const tickAngle = panel.panelKind === 'rho' || panel.panelKind === 'dendrogram'
+            ? 0
+            : (aggregationMode === "samples" ? -45 : 0);
 
         layout[xAxisName] = {
             title: '',
-            type: 'category',
+            type: panel.panelKind === 'dendrogram' ? 'linear' : 'category',
             domain: panelDomains[index],
+            showgrid: panel.panelKind === 'dendrogram',
             tickangle: tickAngle,
+            showticklabels: panel.panelKind === 'dendrogram',
             ticks: '',
             ticklen: 0
         };
-        layout[yAxisName] = index === 0
-            ? {...yAxisBase}
-            : {...yAxisBase, title: '', showticklabels: false};
+        layout[yAxisName] = {
+            ...yAxisBase,
+            showticklabels: false,
+            side: 'left',
+            title: '',
+            showgrid: false,
+            zeroline: false
+        };
+        layout[yAxisName].ticks = '';
+        layout[yAxisName].ticklen = 0;
+        layout[yAxisName].tickvals = [];
+        layout[yAxisName].ticktext = [];
 
         layout.annotations.push({
             text: panel.title,
@@ -1151,8 +1495,78 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             font: {size: 16}
         });
 
+        if(panel.panelKind === 'dendrogram' && clusterTree?.root){
+            const maxHeight = Math.max(1e-9, Number(clusterTree.maxHeight) || 0);
+            const leafToY = new Map();
+            (clusterTree.order || []).forEach((leafIndex, orderIndex) => {
+                leafToY.set(leafIndex, orderIndex);
+            });
+
+            const collectSegments = (node) => {
+                if(!node) return null;
+                if(Object.prototype.hasOwnProperty.call(node, 'leaf')){
+                    return {
+                        y: leafToY.get(node.leaf),
+                        x: maxHeight
+                    };
+                }
+
+                const left = collectSegments(node.left);
+                const right = collectSegments(node.right);
+                if(!left || !right) return null;
+
+                const rawHeight = Number.isFinite(node.height) ? node.height : 0;
+                const x = Math.max(0, maxHeight - rawHeight);
+                const y = (left.y + right.y) / 2;
+
+                data.push({
+                    x: [left.x, x],
+                    y: [left.y, left.y],
+                    type: 'scatter',
+                    mode: 'lines',
+                    xaxis: index === 0 ? 'x' : `x${index + 1}`,
+                    yaxis: index === 0 ? 'y' : `y${index + 1}`,
+                    line: {color: '#5c5c5c', width: 1.2},
+                    hoverinfo: 'skip',
+                    showlegend: false
+                });
+
+                data.push({
+                    x: [right.x, x],
+                    y: [right.y, right.y],
+                    type: 'scatter',
+                    mode: 'lines',
+                    xaxis: index === 0 ? 'x' : `x${index + 1}`,
+                    yaxis: index === 0 ? 'y' : `y${index + 1}`,
+                    line: {color: '#5c5c5c', width: 1.2},
+                    hoverinfo: 'skip',
+                    showlegend: false
+                });
+
+                data.push({
+                    x: [x, x],
+                    y: [left.y, right.y],
+                    type: 'scatter',
+                    mode: 'lines',
+                    xaxis: index === 0 ? 'x' : `x${index + 1}`,
+                    yaxis: index === 0 ? 'y' : `y${index + 1}`,
+                    line: {color: '#5c5c5c', width: 1.2},
+                    hoverinfo: 'skip',
+                    showlegend: false
+                });
+
+                return {x, y};
+            };
+
+            collectSegments(clusterTree.root);
+            layout[xAxisName].range = [0, maxHeight * 1.05];
+            layout[xAxisName].tickformat = '.2f';
+            layout[xAxisName].title = 'Distance';
+            return;
+        }
+
         const isRhoPanel = panel.panelKind === 'rho';
-        return {
+        data.push({
             z: panel.z,
             x: panel.x,
             y: panel.y,
@@ -1160,6 +1574,7 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             text: panel.text,
             texttemplate: panel.texttemplate,
             textfont: panel.textfont,
+            customdata: panel.customdata,
             hovertemplate: panel.hovertemplate,
             xaxis: index === 0 ? 'x' : `x${index + 1}`,
             yaxis: index === 0 ? 'y' : `y${index + 1}`,
@@ -1169,8 +1584,35 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             zmid: isRhoPanel ? 0 : undefined,
             showscale: true,
             colorbar: buildPanelColorbar(panelDomains[index], isRhoPanel ? 'Rho' : 'Z-score', isRhoPanel)
-        };
+        });
     });
+
+    if(rightLabelPanelIndex >= 0){
+        const rightLabelAxisRef = rightLabelPanelIndex === 0 ? 'y' : `y${rightLabelPanelIndex + 1}`;
+        const rhoDomain = panelDomains[rightLabelPanelIndex] || [0.9, 1.0];
+        const labelX = Math.min(0.995, (rhoDomain[1] || 0.98) + 0.008);
+
+        if(layout[rightLabelAxisRef]){
+            layout[rightLabelAxisRef].showline = true;
+            layout[rightLabelAxisRef].linewidth = 1;
+            layout[rightLabelAxisRef].linecolor = '#666666';
+        }
+
+        geneLabels.forEach((label, idx) => {
+            layout.annotations.push({
+                x: labelX,
+                xref: 'paper',
+                y: idx,
+                yref: rightLabelAxisRef,
+                text: String(label),
+                showarrow: false,
+                xanchor: 'left',
+                yanchor: 'middle',
+                align: 'left',
+                font: {size: yTickFontSize, color: '#222222'}
+            });
+        });
+    }
 
     return Promise.resolve(plotWithResponsiveSizing("plot", data, layout)).then(result => {
         saveCurrentViewPlot();
@@ -1349,8 +1791,6 @@ function sortSpatialGenesByMode(genes, mode){
     };
 
     rows.sort((a, b) => {
-        if(mode === "rho_abs_asc") return withNaNLast(a, b, Math.abs(a.rho), Math.abs(b.rho));
-        if(mode === "rho_abs_desc") return withNaNLast(a, b, -Math.abs(a.rho), -Math.abs(b.rho));
         if(mode === "rho_asc") return withNaNLast(a, b, a.rho, b.rho);
         if(mode === "rho_desc") return withNaNLast(a, b, -a.rho, -b.rho);
         return String(a.gene).localeCompare(String(b.gene));
@@ -1399,7 +1839,8 @@ function getSpatialExplorerSelection(){
     const deStatus = document.getElementById("explorerSpatialDeStatus")?.value || "all";
     const membershipMode = document.getElementById("explorerSpatialMembership")?.value || "all";
     const aggregationMode = document.getElementById("explorerSpatialAggregation")?.value || "average";
-    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_abs_asc";
+    const clusterMode = getSpatialClusterMode("explorerSpatialClusterMode");
+    const topNSortMode = document.getElementById("explorerSpatialTopNSort")?.value || "rho_desc";
 
     const groups = ["Posterior", "Anterior", "Somite"];
     const byGene = new Map();
@@ -1486,6 +1927,7 @@ function getSpatialExplorerSelection(){
         deStatus,
         membershipMode,
         aggregationMode,
+        clusterMode,
         filteredGenes,
         rankedGenes,
         topNSortMode,
@@ -1508,6 +1950,15 @@ function updateSpatialExplorerPreview(){
     }
 
     const selection = getSpatialExplorerSelection();
+    const clusterLabel = selection.clusterMode === "rna"
+        ? "Cluster by RNA"
+        : selection.clusterMode === "protein"
+            ? "Cluster by Protein"
+            : selection.clusterMode === "posterior_rna_desc"
+                ? "Posterior RNA high to low"
+                : selection.clusterMode === "posterior_protein_desc"
+                    ? "Posterior Protein high to low"
+                    : "Default: posterior mean (RNA+Protein) high to low";
     const preview = applyTopNPreview(selection.rankedGenes, "explorerSpatialTopNEnabled", "explorerSpatialTopN");
     const displayCells = preview.displayGenes.length * selection.estimatedColumns;
     const displayRisk = getExplorerRiskLabel(displayCells, {
@@ -1527,8 +1978,8 @@ function updateSpatialExplorerPreview(){
 
     setExplorerFeedback("explorerSpatialEstimate", "explorerSpatialAdvice", {
         estimateText: preview.previewEnabled
-            ? `Selection preview: ${selection.filteredGenes.length} matched genes. Plot will show top ${preview.displayGenes.length} genes (~${displayCells.toLocaleString()} cells, ${displayRisk} load), sorted by ${selection.topNSortMode}.`
-            : `Selection preview: ${selection.filteredGenes.length} genes, ~${selection.estimatedColumns} columns, ~${selection.estimatedCells.toLocaleString()} heatmap cells (${selection.risk} load).`,
+            ? `Selection preview: ${selection.filteredGenes.length} matched genes. Plot will show top ${preview.displayGenes.length} genes (~${displayCells.toLocaleString()} cells, ${displayRisk} load), sorted by ${selection.topNSortMode}. Row order: ${clusterLabel}.`
+            : `Selection preview: ${selection.filteredGenes.length} genes, ~${selection.estimatedColumns} columns, ~${selection.estimatedCells.toLocaleString()} heatmap cells (${selection.risk} load). Row order: ${clusterLabel}.`,
         adviceText: buildExplorerAdvice({
             risk: preview.previewEnabled ? displayRisk : selection.risk,
             aggregationMode: selection.aggregationMode,
@@ -1547,7 +1998,7 @@ async function plotExplorerSpatialHeatmap(){
     }
 
     const selection = getSpatialExplorerSelection();
-    const { rhoBand, deStatus, membershipMode, aggregationMode, filteredGenes, rankedGenes, deListRequiredButMissing } = selection;
+    const { rhoBand, deStatus, membershipMode, aggregationMode, clusterMode, filteredGenes, rankedGenes, deListRequiredButMissing } = selection;
 
     if(deListRequiredButMissing){
         alert("Differential-expression gene list was not loaded. Check the DE list filename in data loading configuration.");
@@ -1573,6 +2024,15 @@ async function plotExplorerSpatialHeatmap(){
         : rhoBand === "neg" ? "rho < -0.5"
         : rhoBand === "mid" ? "-0.5 <= rho <= 0.5"
         : "rho > 0.5";
+    const clusterLabel = clusterMode === "rna"
+        ? "clustered by RNA"
+        : clusterMode === "protein"
+            ? "clustered by Protein"
+            : clusterMode === "posterior_rna_desc"
+                ? "sorted by posterior RNA (high to low)"
+                : clusterMode === "posterior_protein_desc"
+                    ? "sorted by posterior Protein (high to low)"
+                    : "default order (posterior mean RNA+Protein high to low)";
     const deLabel = deStatus === "all"
         ? "all genes"
         : deStatus === "de" ? "DE only" : "non-DE only";
@@ -1584,6 +2044,7 @@ async function plotExplorerSpatialHeatmap(){
         await plotSpatialHeatmap(genesToPlot, {
             membershipMode,
             aggregationMode,
+            clusterMode,
             plotContext: {
                 source: "explorer"
             },
@@ -1593,7 +2054,7 @@ async function plotExplorerSpatialHeatmap(){
         const previewNote = preview.previewEnabled && genesToPlot.length < filteredGenes.length
             ? ` Showing top ${genesToPlot.length} of ${filteredGenes.length} matched genes.`
             : ` Plotted ${genesToPlot.length} genes.`;
-        setExplorerStatus("explorerSpatialStatus", `${previewNote}${heavyNote}`.trim());
+        setExplorerStatus("explorerSpatialStatus", `${previewNote} Row order is ${clusterLabel}.${heavyNote}`.trim());
         stopExplorerRenderTimer(timerState, 'Rendered');
     } catch (err) {
         stopExplorerRenderTimer(timerState, 'Failed');
@@ -1615,6 +2076,7 @@ function getTemporalExplorerSelection(){
     const aggregationMode = document.getElementById("explorerTemporalAggregation")?.value || "average";
     const selectedMetrics = getSelectedTemporalMetrics(".explorer-temporal-metric-checkbox");
     const pValueMetric = document.getElementById("explorerTemporalPValueMetric")?.value || "P_VALUE";
+    const sortConfig = getTemporalSortConfig('explorerTemporalSortDataset', 'explorerTemporalSortMetric', 'explorerTemporalSortOrder');
     const topNSortMode = document.getElementById("explorerTemporalTopNSort")?.value || "metric_asc";
     const thresholdRaw = document.getElementById("explorerTemporalPValueThreshold")?.value || "all";
     const threshold = thresholdRaw === "all" ? null : Number(thresholdRaw);
@@ -1693,6 +2155,7 @@ function getTemporalExplorerSelection(){
         aggregationMode,
         selectedMetrics,
         pValueMetric,
+        sortConfig,
         threshold,
         filteredGenes,
         rankedGenes,
@@ -1750,7 +2213,7 @@ async function plotExplorerTemporalHeatmap(){
     }
 
     const selection = getTemporalExplorerSelection();
-    const { region, membershipMode, aggregationMode, selectedMetrics, pValueMetric, threshold, filteredGenes, rankedGenes } = selection;
+    const { region, membershipMode, aggregationMode, selectedMetrics, pValueMetric, threshold, sortConfig, filteredGenes, rankedGenes } = selection;
 
     if(filteredGenes.length === 0){
         const thresholdText = threshold === null ? "" : ` with ${pValueMetric} <= ${threshold}`;
@@ -1775,6 +2238,7 @@ async function plotExplorerTemporalHeatmap(){
             membershipMode,
             aggregationMode,
             selectedMetrics,
+            sortConfig,
             plotContext: {
                 source: "explorer",
                 region
@@ -2035,6 +2499,8 @@ async function plotGoSpatialHeatmap(){
         const goOptions = {
             membershipMode: getHeatmapGeneMembership("goSpatialGeneMembership"),
             aggregationMode: getAggregationMode("goSpatialAggregation"),
+            deStatus: (document.getElementById("goSpatialDeStatus")?.value || "all"),
+            clusterMode: getSpatialClusterMode("goSpatialClusterMode"),
             plotContext: {
                 source: "go",
                 region: "all-regions",
@@ -2090,6 +2556,7 @@ async function plotGoTemporalHeatmap(){
             aggregationMode: getAggregationMode("goTemporalAggregation"),
             selectedMetrics: getSelectedTemporalMetrics(".go-temporal-metric-checkbox"),
             pValueFilterMode: (document.getElementById("goTemporalPValueFilter")?.value || "all"),
+            sortConfig: getTemporalSortConfig('goTemporalSortDataset', 'goTemporalSortMetric', 'goTemporalSortOrder'),
             plotContext: {
                 source: "go",
                 region,
@@ -2128,6 +2595,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
     const membershipMode = optionsOverride?.membershipMode || getHeatmapGeneMembership("temporalGeneMembership");
     const selectedMetrics = optionsOverride?.selectedMetrics || getSelectedTemporalMetrics();
     const pValueFilterMode = optionsOverride?.pValueFilterMode || (document.getElementById("temporalPValueFilter")?.value || "all");
+    const sortConfig = optionsOverride?.sortConfig || getTemporalSortConfig('temporalSortDataset', 'temporalSortMetric', 'temporalSortOrder');
     const plotContext = optionsOverride?.plotContext || {};
     setCurrentPlotMetadata({
         modality: "spatiotemporal",
@@ -2148,6 +2616,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         membershipMode,
         selectedMetrics,
         pValueFilterMode,
+        sortConfig,
         applyPValueFilter
     });
 
@@ -2173,8 +2642,7 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             gene,
             label: rnaGene[0]?.ID || protGene[0]?.ID,
             rnaGene,
-            protGene,
-            lagSort: getLagForSort(rnaGene, protGene)
+            protGene
         });
     });
 
@@ -2185,7 +2653,23 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         protRows: entries.reduce((sum, e) => sum + e.protGene.length, 0)
     });
 
-    entries.sort((a, b) => a.lagSort - b.lagSort);
+    entries.sort((a, b) => {
+        const av = getTemporalSortValue(a, sortConfig);
+        const bv = getTemporalSortValue(b, sortConfig);
+        const aMissing = Number.isNaN(av);
+        const bMissing = Number.isNaN(bv);
+
+        if(aMissing && bMissing) return String(a.label).localeCompare(String(b.label));
+        if(aMissing) return 1;
+        if(bMissing) return -1;
+
+        if(sortConfig.order === 'desc'){
+            if(bv !== av) return bv - av;
+        } else if(av !== bv){
+            return av - bv;
+        }
+        return String(a.label).localeCompare(String(b.label));
+    });
 
     if(entries.length === 0){
         if(applyPValueFilter){
@@ -2417,7 +2901,10 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
             y: -0.01,
             yanchor: 'top',
             len: Math.max(0.08, width * 0.9),
-            thickness: 8
+            thickness: 8,
+            tickmode: titleText === 'Z-score' ? 'array' : undefined,
+            tickvals: titleText === 'Z-score' ? [-2, -1, 0, 1, 2] : undefined,
+            ticktext: titleText === 'Z-score' ? ['-2', '-1', '0', '1', '2'] : undefined
         };
     };
 

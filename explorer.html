@@ -88,6 +88,22 @@ placeholder="Enter genes separated by commas"></textarea>
 <option value="samples">Individual samples (if available)</option>
 </select>
 
+<label for="spatialDeStatus">Differential expression:</label>
+<select id="spatialDeStatus">
+<option value="all" selected>All genes</option>
+<option value="de">Differentially expressed only</option>
+<option value="nonde">Not differentially expressed only</option>
+</select>
+
+<label for="spatialClusterMode">Row order:</label>
+<select id="spatialClusterMode">
+<option value="none" selected>Default: posterior mean (RNA+Protein) high to low</option>
+<option value="posterior_rna_desc">Posterior RNA high to low</option>
+<option value="posterior_protein_desc">Posterior Protein high to low</option>
+<option value="rna">Cluster by RNA, apply order to Protein</option>
+<option value="protein">Cluster by Protein, apply order to RNA</option>
+</select>
+
 <button onclick="plotSpatialHeatmap()">Generate Heatmap</button>
 
 </div>
@@ -162,6 +178,30 @@ Overlay BioCycle sine fit
 <label class="metric-option"><input type="checkbox" class="temporal-metric-checkbox" value="SCATTER"> SCATTER <span class="metric-help" tabindex="0" data-tooltip="Scatter/noise estimate around the fitted periodic signal (higher values indicate more variability).">?</span></label>
 </div>
 
+<label for="temporalSortDataset">Sort genes using dataset:</label>
+<select id="temporalSortDataset">
+<option value="rna" selected>RNA</option>
+<option value="protein">Protein</option>
+</select>
+
+<label for="temporalSortMetric">Sort genes by metadata:</label>
+<select id="temporalSortMetric">
+<option value="P_VALUE">P_VALUE</option>
+<option value="Q_VALUE">Q_VALUE</option>
+<option value="PERIOD">PERIOD</option>
+<option value="LAG" selected>LAG</option>
+<option value="AMPLITUDE">AMPLITUDE</option>
+<option value="OFFSET">OFFSET</option>
+<option value="MEAN_PERIODICITY">MEAN_PERIODICITY</option>
+<option value="SCATTER">SCATTER</option>
+</select>
+
+<label for="temporalSortOrder">Sort order:</label>
+<select id="temporalSortOrder">
+<option value="asc" selected>Ascending</option>
+<option value="desc">Descending</option>
+</select>
+
 <div id="temporalPValueFilterWrap" class="conditional-filter" style="display:none;">
 <label for="temporalPValueFilter">P-value gene filter:</label>
 <select id="temporalPValueFilter">
@@ -225,6 +265,22 @@ GO Spatiotemporal Heatmap
 <option value="samples">Individual samples (if available)</option>
 </select>
 
+<label for="goSpatialDeStatus">Differential expression:</label>
+<select id="goSpatialDeStatus">
+<option value="all" selected>All genes</option>
+<option value="de">Differentially expressed only</option>
+<option value="nonde">Not differentially expressed only</option>
+</select>
+
+<label for="goSpatialClusterMode">Row order:</label>
+<select id="goSpatialClusterMode">
+<option value="none" selected>Default: posterior mean (RNA+Protein) high to low</option>
+<option value="posterior_rna_desc">Posterior RNA high to low</option>
+<option value="posterior_protein_desc">Posterior Protein high to low</option>
+<option value="rna">Cluster by RNA, apply order to Protein</option>
+<option value="protein">Cluster by Protein, apply order to RNA</option>
+</select>
+
 <button id="goSpatialGenerateBtn" onclick="plotGoSpatialHeatmap()">Generate GO heatmap (Spatial)</button>
 <p id="goGeneCount" style="margin-top: 0.75rem; font-size: 0.9rem; color: #333;"></p>
 
@@ -265,6 +321,30 @@ GO Spatiotemporal Heatmap
 <label class="metric-option"><input type="checkbox" class="go-temporal-metric-checkbox" value="MEAN_PERIODICITY"> MEAN_PERIODICITY <span class="metric-help" tabindex="0" data-tooltip="Average periodicity score reported by BIO_CYCLE/JTK_CYCLE for rhythmic behavior.">?</span></label>
 <label class="metric-option"><input type="checkbox" class="go-temporal-metric-checkbox" value="SCATTER"> SCATTER <span class="metric-help" tabindex="0" data-tooltip="Scatter/noise estimate around the fitted periodic signal (higher values indicate more variability).">?</span></label>
 </div>
+
+<label for="goTemporalSortDataset">Sort genes using dataset:</label>
+<select id="goTemporalSortDataset">
+<option value="rna" selected>RNA</option>
+<option value="protein">Protein</option>
+</select>
+
+<label for="goTemporalSortMetric">Sort genes by metadata:</label>
+<select id="goTemporalSortMetric">
+<option value="P_VALUE">P_VALUE</option>
+<option value="Q_VALUE">Q_VALUE</option>
+<option value="PERIOD">PERIOD</option>
+<option value="LAG" selected>LAG</option>
+<option value="AMPLITUDE">AMPLITUDE</option>
+<option value="OFFSET">OFFSET</option>
+<option value="MEAN_PERIODICITY">MEAN_PERIODICITY</option>
+<option value="SCATTER">SCATTER</option>
+</select>
+
+<label for="goTemporalSortOrder">Sort order:</label>
+<select id="goTemporalSortOrder">
+<option value="asc" selected>Ascending</option>
+<option value="desc">Descending</option>
+</select>
 
 <div id="goTemporalPValueFilterWrap" class="conditional-filter" style="display:none;">
 <label for="goTemporalPValueFilter">P-value gene filter:</label>
@@ -337,15 +417,22 @@ Spatiotemporal Filters
 <option value="samples">Individual samples (if available)</option>
 </select>
 
+<label for="explorerSpatialClusterMode">Row order:</label>
+<select id="explorerSpatialClusterMode">
+<option value="none" selected>Default: posterior mean (RNA+Protein) high to low</option>
+<option value="posterior_rna_desc">Posterior RNA high to low</option>
+<option value="posterior_protein_desc">Posterior Protein high to low</option>
+<option value="rna">Cluster by RNA, apply order to Protein</option>
+<option value="protein">Cluster by Protein, apply order to RNA</option>
+</select>
+
 <div class="explorer-preview-controls">
 <label class="metric-option"><input type="checkbox" id="explorerSpatialTopNEnabled" checked> Use top-N preview</label>
 <label for="explorerSpatialTopN">N:</label>
 <input id="explorerSpatialTopN" type="number" min="1" step="1" value="10">
 <label for="explorerSpatialTopNSort">Sort:</label>
 <select id="explorerSpatialTopNSort">
-<option value="rho_abs_desc">Highest |rho| first</option>
-<option value="rho_abs_asc" selected>Lowest |rho| first</option>
-<option value="rho_desc">Highest rho first</option>
+<option value="rho_desc" selected>Highest rho first</option>
 <option value="rho_asc">Lowest rho first</option>
 <option value="alpha">Alphabetical</option>
 </select>
@@ -416,6 +503,30 @@ Spatiotemporal Filters
 <option value="both">Both RNA and Protein</option>
 <option value="rna_only">RNA only</option>
 <option value="prot_only">Protein only</option>
+</select>
+
+<label for="explorerTemporalSortDataset">Heatmap row sort dataset:</label>
+<select id="explorerTemporalSortDataset">
+<option value="rna" selected>RNA</option>
+<option value="protein">Protein</option>
+</select>
+
+<label for="explorerTemporalSortMetric">Heatmap row sort metadata:</label>
+<select id="explorerTemporalSortMetric">
+<option value="P_VALUE">P_VALUE</option>
+<option value="Q_VALUE">Q_VALUE</option>
+<option value="PERIOD">PERIOD</option>
+<option value="LAG" selected>LAG</option>
+<option value="AMPLITUDE">AMPLITUDE</option>
+<option value="OFFSET">OFFSET</option>
+<option value="MEAN_PERIODICITY">MEAN_PERIODICITY</option>
+<option value="SCATTER">SCATTER</option>
+</select>
+
+<label for="explorerTemporalSortOrder">Heatmap row sort order:</label>
+<select id="explorerTemporalSortOrder">
+<option value="asc" selected>Ascending</option>
+<option value="desc">Descending</option>
 </select>
 
 <div class="explorer-preview-controls">
