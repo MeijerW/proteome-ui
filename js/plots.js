@@ -4,6 +4,8 @@ let CURRENT_PLOT_METADATA = {
     view: "general",
     source: "manual",
     region: "",
+    gene: "",
+    geneSet: "",
     goId: "",
     goName: ""
 };
@@ -16,6 +18,30 @@ function cleanFilenamePart(value){
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "")
         .toLowerCase();
+}
+
+function buildGeneListToken(genes, maxPreview = 3){
+    if(!Array.isArray(genes)) return "";
+
+    const cleaned = genes
+        .map(gene => cleanFilenamePart(gene))
+        .filter(Boolean);
+
+    if(cleaned.length === 0) return "";
+    if(cleaned.length === 1) return cleaned[0];
+
+    const preview = cleaned.slice(0, maxPreview).join("-");
+    const checksum = cleaned.join("|")
+        .split("")
+        .reduce((acc, ch) => ((acc * 31) + ch.charCodeAt(0)) >>> 0, 7)
+        .toString(36)
+        .slice(0, 6);
+
+    if(cleaned.length <= maxPreview){
+        return `${preview}-${checksum}`;
+    }
+
+    return `${preview}-plus-${cleaned.length - maxPreview}-${checksum}`;
 }
 
 function setCurrentPlotMetadata(metadata = {}){
@@ -51,6 +77,8 @@ function buildPlotDownloadFilename(){
     const view = cleanFilenamePart(CURRENT_PLOT_METADATA.view || "general");
     const source = cleanFilenamePart(CURRENT_PLOT_METADATA.source || "manual");
     const region = cleanFilenamePart(CURRENT_PLOT_METADATA.region || "");
+    const gene = cleanFilenamePart(CURRENT_PLOT_METADATA.gene || "");
+    const geneSet = cleanFilenamePart(CURRENT_PLOT_METADATA.geneSet || "");
     const goId = cleanFilenamePart(CURRENT_PLOT_METADATA.goId || "");
     const goName = cleanFilenamePart(CURRENT_PLOT_METADATA.goName || "");
 
@@ -58,6 +86,8 @@ function buildPlotDownloadFilename(){
     if(view) parts.push(view);
     if(source && source !== "manual") parts.push(source);
     if(region) parts.push(region);
+    if(gene) parts.push(gene);
+    if(geneSet && geneSet !== gene) parts.push(geneSet);
     if(goId) parts.push(goId);
     if(goName) parts.push(goName);
 
@@ -440,6 +470,7 @@ function plotSpatial(){
     }
 
     const traces = [];
+    const spatialBoxWidth = 0.45;
     const displayGene = (rnaGene[0]?.ID || protGene[0]?.ID || gene).toUpperCase();
     setCurrentPlotMetadata({
         modality: "spatial",
@@ -447,6 +478,8 @@ function plotSpatial(){
         source: "manual",
         plotViewportMode: "spatial-single",
         region: "all-regions",
+        gene: displayGene,
+        geneSet: displayGene,
         goId: "",
         goName: ""
     });
@@ -456,12 +489,34 @@ function plotSpatial(){
         : rnaGene.length > 0 ? " — RNA"
         : " — Protein";
     const layout = {
-        title: '',
+        title: {
+            text: `${displayGene} Spatial Expression`,
+            x: 0.5,
+            xanchor: 'center'
+        },
         showlegend: true,
         template: "simple_white",
         height: 600,
-        margin: {l: 80, r: 220, t: 90, b: 80},
-        annotations: [buildSpatialCorrelationGuideAnnotation()]
+        margin: {l: 80, r: 300, t: 90, b: 80},
+        annotations: [
+            buildSpatialCorrelationGuideAnnotation(),
+            {
+                x: 1.02,
+                y: 0.68,
+                xref: 'paper',
+                yref: 'paper',
+                xanchor: 'left',
+                yanchor: 'top',
+                align: 'left',
+                showarrow: false,
+                bgcolor: 'rgba(255,255,255,0.92)',
+                bordercolor: '#c7c2b8',
+                borderwidth: 1,
+                borderpad: 8,
+                font: {size: 11, color: '#40362e'},
+                text: `<b>Rho score</b><br>${formatSpatialCorrelation(rhoValue)} (${rhoBand})`
+            }
+        ]
     };
 
     const order = ['Posterior', 'Anterior', 'Somite'];
@@ -473,6 +528,7 @@ function plotSpatial(){
             y: rnaGene.map(d => d.spatialValue),
             type: "box",
             name: "RNA",
+            width: spatialBoxWidth,
             marker: {color: "#d5af34"}
         });
     }
@@ -484,6 +540,7 @@ function plotSpatial(){
             y: protGene.map(d => d.spatialValue),
             type: "box",
             name: "Protein",
+            width: spatialBoxWidth,
             marker: {color: "#8281be"}
         });
     }
@@ -491,16 +548,54 @@ function plotSpatial(){
     if(traces.length === 2){
         layout.grid = {rows: 2, columns: 1, pattern: 'independent'};
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'log2 data'};
+        layout.yaxis = {title: 'RNA (Log2 Normalized Counts)'};
         layout.xaxis2 = {title: 'Group'};
-        layout.yaxis2 = {title: 'log2 data'};
+        layout.yaxis2 = {title: 'Protein (LFQ)'};
+        layout.annotations = [
+            ...layout.annotations,
+            {
+                text: '<b>RNA</b>',
+                x: 0.5,
+                y: 1.12,
+                xref: 'x domain',
+                yref: 'y domain',
+                showarrow: false,
+                font: {size: 14, color: '#111111'}
+            },
+            {
+                text: '<b>Protein</b>',
+                x: 0.5,
+                y: 1.12,
+                xref: 'x2 domain',
+                yref: 'y2 domain',
+                showarrow: false,
+                font: {size: 14, color: '#111111'}
+            }
+        ];
         traces[0].xaxis = 'x';
         traces[0].yaxis = 'y';
         traces[1].xaxis = 'x2';
         traces[1].yaxis = 'y2';
     } else {
         layout.xaxis = {title: 'Group'};
-        layout.yaxis = {title: 'log2 data'};
+        layout.yaxis = {
+            title: traces[0]?.name === 'Protein'
+                ? 'Protein (LFQ)'
+                : 'RNA (Log2 Normalized Counts)'
+        };
+        const singleDatasetLabel = traces[0]?.name === 'Protein' ? 'Protein' : 'RNA';
+        layout.annotations = [
+            ...layout.annotations,
+            {
+                text: `<b>${singleDatasetLabel}</b>`,
+                x: 0.5,
+                y: 1.1,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {size: 14, color: '#111111'}
+            }
+        ];
     }
 
     plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
@@ -905,6 +1000,11 @@ function buildBiocycleFitTrace(rows, datasetLabel, lineColor){
     };
 }
 
+function formatBiocycleStatValue(value){
+    if(value === null || value === undefined || Number.isNaN(Number(value))) return "n/a";
+    return Number(value).toExponential(2);
+}
+
 function plotTemporal(){
     if(RNA_DATA.length === 0 || PROT_DATA.length === 0){
         alert("Data is still loading. Please wait a moment and try again.");
@@ -913,14 +1013,6 @@ function plotTemporal(){
 
     const geneInput = document.getElementById("temporalGene").value.trim();
     const gene = (typeof window.resolveGeneAlias === "function" ? window.resolveGeneAlias(geneInput) : geneInput).toLowerCase();
-    setCurrentPlotMetadata({
-        modality: "spatiotemporal",
-        view: "single-gene",
-        source: "manual",
-        region: "all-regions",
-        goId: "",
-        goName: ""
-    });
 
     clearTemporalStatsPanel();
 
@@ -946,6 +1038,17 @@ function plotTemporal(){
 
     const firstPanel = regionPanelsWithData[0] || {};
     const displayGene = (firstPanel.rnaGene?.[0]?.ID || firstPanel.protGene?.[0]?.ID || gene).toUpperCase();
+
+    setCurrentPlotMetadata({
+        modality: "spatiotemporal",
+        view: "single-gene",
+        source: "manual",
+        region: "all-regions",
+        gene: displayGene,
+        geneSet: displayGene,
+        goId: "",
+        goName: ""
+    });
 
     const columns = regionPanels.length;
     const rows = 2;
@@ -1014,7 +1117,7 @@ function plotTemporal(){
                         legendgroup: rnaLegendGroup,
                         xaxis: rnaAxis.x,
                         yaxis: rnaAxis.y,
-                        showlegend: true
+                        showlegend: false
                     });
                 }
             }
@@ -1066,7 +1169,7 @@ function plotTemporal(){
                         legendgroup: protLegendGroup,
                         xaxis: protAxis.x,
                         yaxis: protAxis.y,
-                        showlegend: true
+                        showlegend: false
                     });
                 }
             }
@@ -1074,12 +1177,15 @@ function plotTemporal(){
     });
 
     const layout = {
-        title: '',
+        title: {
+            text: `${displayGene} Spatiotemporal Expression`,
+            x: 0.5,
+            xanchor: 'center'
+        },
         template: "simple_white",
         height: 700,
         grid: {rows, columns, pattern: 'independent'},
-        showlegend: true,
-        legend: { orientation: 'h', y: 1.1 },
+        showlegend: false,
         annotations: []
     };
 
@@ -1126,6 +1232,58 @@ function plotTemporal(){
             showarrow: false,
             font: {size: 13}
         });
+
+        layout.annotations.push({
+            text: panel.region,
+            x: 0.5,
+            y: 1.05,
+            xref: protAxis.suffix === '' ? 'x domain' : `x${protAxis.suffix} domain`,
+            yref: protAxis.suffix === '' ? 'y domain' : `y${protAxis.suffix} domain`,
+            showarrow: false,
+            font: {size: 13}
+        });
+
+        if(showSineFit){
+            const rnaFitParams = getBiocycleFitParams(panel.rnaGene);
+            if(rnaFitParams){
+                layout.annotations.push({
+                    text: `p=${formatBiocycleStatValue(rnaFitParams.pValue)}<br>q=${formatBiocycleStatValue(rnaFitParams.qValue)}`,
+                    x: 0.02,
+                    y: 0.98,
+                    xref: rnaAxis.suffix === '' ? 'x domain' : `x${rnaAxis.suffix} domain`,
+                    yref: rnaAxis.suffix === '' ? 'y domain' : `y${rnaAxis.suffix} domain`,
+                    xanchor: 'left',
+                    yanchor: 'top',
+                    align: 'left',
+                    showarrow: false,
+                    bgcolor: 'rgba(255,255,255,0.88)',
+                    bordercolor: 'rgba(0,0,0,0.15)',
+                    borderwidth: 1,
+                    borderpad: 4,
+                    font: {size: 10, color: '#222'}
+                });
+            }
+
+            const protFitParams = getBiocycleFitParams(panel.protGene);
+            if(protFitParams){
+                layout.annotations.push({
+                    text: `p=${formatBiocycleStatValue(protFitParams.pValue)}<br>q=${formatBiocycleStatValue(protFitParams.qValue)}`,
+                    x: 0.02,
+                    y: 0.98,
+                    xref: protAxis.suffix === '' ? 'x domain' : `x${protAxis.suffix} domain`,
+                    yref: protAxis.suffix === '' ? 'y domain' : `y${protAxis.suffix} domain`,
+                    xanchor: 'left',
+                    yanchor: 'top',
+                    align: 'left',
+                    showarrow: false,
+                    bgcolor: 'rgba(255,255,255,0.88)',
+                    bordercolor: 'rgba(0,0,0,0.15)',
+                    borderwidth: 1,
+                    borderpad: 4,
+                    font: {size: 10, color: '#222'}
+                });
+            }
+        }
     });
 
     plotWithResponsiveSizing("plot", traces, layout, {heightMode: "single-gene"});
@@ -1168,6 +1326,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
         view: "heatmap",
         source: plotContext.source || "manual",
         region: plotContext.region || "all-regions",
+        gene: "",
+        geneSet: buildGeneListToken(genes),
         goId: plotContext.goId || "",
         goName: plotContext.goName || ""
     });
@@ -1424,6 +1584,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
     const stripColumnGap = panels.length > 1 ? 0.03 : 0;
 
     setCurrentPlotMetadata({
+        gene: "",
+        geneSet: buildGeneListToken(geneLabels),
         headerStrip: {
             kind: 'spatial-expression',
             title: titleText,
@@ -2602,6 +2764,8 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         view: "heatmap",
         source: plotContext.source || "manual",
         region,
+        gene: "",
+        geneSet: buildGeneListToken(genes),
         goId: plotContext.goId || "",
         goName: plotContext.goName || ""
     });
@@ -2855,6 +3019,8 @@ function renderTemporalHeatmapFromGenes(inputGenes, region, optionsOverride = nu
         view: "heatmap",
         source: plotContext.source || "manual",
         region,
+        gene: "",
+        geneSet: buildGeneListToken(geneLabels),
         goId: plotContext.goId || "",
         goName: plotContext.goName || "",
         headerStrip: {
