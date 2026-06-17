@@ -673,6 +673,7 @@ function getSpatialClusterMode(modeId){
     const node = document.getElementById(modeId);
     const mode = node ? String(node.value || "none").toLowerCase() : "none";
     if(mode === "rna" || mode === "protein") return mode;
+    if(mode === "rho_desc") return mode;
     if(mode === "posterior_rna_desc" || mode === "posterior_protein_desc") return mode;
     return "none";
 }
@@ -1380,6 +1381,14 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
             return (Number.isFinite(b.posteriorSort) ? b.posteriorSort : Number.NEGATIVE_INFINITY)
                 - (Number.isFinite(a.posteriorSort) ? a.posteriorSort : Number.NEGATIVE_INFINITY);
         });
+    } else if(clusterMode === "rho_desc"){
+        entries.sort((a, b) => {
+            const av = Number.isFinite(a.rhoValue) ? a.rhoValue : Number.NEGATIVE_INFINITY;
+            const bv = Number.isFinite(b.rhoValue) ? b.rhoValue : Number.NEGATIVE_INFINITY;
+            if(bv !== av) return bv - av;
+            return (Number.isFinite(b.posteriorSort) ? b.posteriorSort : Number.NEGATIVE_INFINITY)
+                - (Number.isFinite(a.posteriorSort) ? a.posteriorSort : Number.NEGATIVE_INFINITY);
+        });
     } else {
         entries.sort((a, b) => b.posteriorSort - a.posteriorSort);
     }
@@ -1528,6 +1537,8 @@ function plotSpatialHeatmap(overrideGenes, optionsOverride = null){
                 ? "Posterior RNA high to low"
                 : clusterMode === "posterior_protein_desc"
                     ? "Posterior Protein high to low"
+                    : clusterMode === "rho_desc"
+                        ? "Rho score high to low"
                     : "";
     const titleBase = customPlotTitle || "Spatial Expression Heatmap";
     const titleText = clusteringLabel ? `${titleBase} - ${clusteringLabel}` : titleBase;
