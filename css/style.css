@@ -957,9 +957,21 @@ footer {
 .home-method-card--image {
     background: #ffffff;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
     min-height: 260px;
+}
+
+.home-method-image-title {
+    margin: 0;
+    color: #006c70;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    line-height: 1.2;
 }
 
 .home-method-card--image img {

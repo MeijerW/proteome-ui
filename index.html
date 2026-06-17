@@ -45,8 +45,8 @@
   <!-- Left: No Coding Needed -->
   <div class="home-no-coding">
     <h3>No Coding Needed</h3>
-    <p class="home-panel-lead"><strong>Interactively visualize spatial and spatiotemporal gene expression patterns.</strong></p>
-    <p>We have combined RNA sequencing and proteomics data for a comprehensive study of gene and protein expression in somitogenesis.</p>
+    <p class="home-panel-lead"><strong>Interactively visualize spatial and spatiotemporal gene expression patterns in somitogenesis.</strong></p>
+    <p>Somitogenesis is a complex process in embryonic development, generally arrived through a clock and wavefront model. The wavefront is determined by gradients, while the clock is so far known as a travelling wave of gene expression through the presomitic mesoderm (PSM). To investigate the components of this process, we have combined RNA sequencing and proteomics for a comprehensive study of gene and protein expression in somitogenesis.</p>
   </div>
 
   <!-- Right: Source of This Data -->
@@ -70,24 +70,38 @@
 
     <!-- Row 1: text (left) + graphic (right) -->
     <article class="home-method-card home-method-card--text">
-      <h3>Spatial data methods</h3>
-      <p class="home-method-lead"><strong>Paste your background text for the spatial methods here.</strong></p>
-      <p>[PASTE SPATIAL METHODS DESCRIPTION HERE]</p>
+      <h3>Investigating the gradients that make up the wavefront in somitogenesis</h3>
+      
+      <p>To investigate genes and proteins that could play a role in giving positional information to cells in the PSM, we separated the PSM into 3 regions; posterior PSM (p-PSM), anterior PSM (a-PSM), and Somite regions.
+        We then pooled 8 tails per region and performed RNA sequencing and proteomics to get a comprehensive overview of gene and protein expression in these regions. With this data, we can investigate the gradients that make up the wavefront in somitogenesis. 
+        <br>
+        <br> In addition to this, we performed differential expression analysis to identify genes and proteins that are differentially expressed between these regions, which could be important for the wavefront and somitogenesis in general. 
+        Lastly, we also calculated the correlation between RNA and protein expression (Rho score) for each gene, to investigate the relationship between RNA and protein expression in these regions.
+      </p>
     </article>
 
     <figure class="home-method-card home-method-card--image" aria-label="Spatial methods graphic">
+      <figcaption class="home-method-image-title">Spatial method</figcaption>
       <img src="assets/spatial-graphic.png" alt="Spatial data methods graphic">
     </figure>
 
     <!-- Row 2: graphic (left) + text (right) -->
     <figure class="home-method-card home-method-card--image" aria-label="Spatiotemporal methods graphic">
+      <figcaption class="home-method-image-title">Spatiotemporal method</figcaption>
       <img src="assets/spatiotemporal-graphic.png" alt="Spatiotemporal methods graphic">
     </figure>
 
     <article class="home-method-card home-method-card--text">
-      <h3>Spatiotemporal data methods</h3>
-      <p class="home-method-lead"><strong>Paste your background text for the spatiotemporal methods here.</strong></p>
-      <p>[PASTE SPATIOTEMPORAL METHODS DESCRIPTION HERE]</p>
+      <h3>Investigating gene expression dynamics during different oscillation phases of somitogenesis</h3>
+            <p>To also investigate the dynamics of gene expression during different oscillation phases, we developed a spatiotemporal method using microfluidic entrainment of tails.
+              We then sent the pooled tails from the same phase for RNA sequencing and proteomics.
+              <br>
+              <br>
+              The resulting data we analysed using BIO_CYCLE <sup>1</sup>, a neural network-based method to identify oscillating genes and proteins.
+              This method allows us to identify potentioal new oscillators on both transcript and protein level. 
+              <br>
+              <br>
+              <sup>1</sup> Forest Agostinelli, Nicholas Ceglia, Babak Shahbaba, Paolo Sassone-Corsi, Pierre Baldi, What time is it? Deep learning approaches for circadian rhythms, Bioinformatics, Volume 32, Issue 12, June 2016, Pages i8–i17, https://doi.org/10.1093/bioinformatics/btw243
     </article>
 
   </div>
