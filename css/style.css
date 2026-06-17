@@ -897,6 +897,78 @@ footer {
     color: #005a5a;
 }
 
+/* Methods background section */
+
+.home-methods {
+    background: #ffffff;
+    width: 100%;
+}
+
+.home-methods-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 40px;
+}
+
+.home-methods-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+}
+
+.home-method-card {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.home-method-card--text {
+    background: #f9fbfb;
+    border-left: 4px solid #006c70;
+    padding: 26px 28px;
+}
+
+.home-method-card--text h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #006c70;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 14px;
+}
+
+.home-method-lead {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #222;
+}
+
+.home-method-card--text p {
+    margin: 0 0 10px;
+    font-size: 0.93rem;
+    line-height: 1.65;
+    color: #333;
+}
+
+.home-method-card--text p:last-child {
+    margin-bottom: 0;
+}
+
+.home-method-card--image {
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+}
+
+.home-method-card--image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
 /* How it works */
 
 .home-how {
@@ -1044,6 +1116,15 @@ footer {
         grid-template-columns: 1fr;
         padding: 40px 24px;
         gap: 36px;
+    }
+
+    .home-methods-inner {
+        padding: 48px 24px;
+    }
+
+    .home-methods-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
     }
 
     .home-hero-title {
