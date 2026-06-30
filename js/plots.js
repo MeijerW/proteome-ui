@@ -1003,7 +1003,10 @@ function buildBiocycleFitTrace(rows, datasetLabel, lineColor){
 
 function formatBiocycleStatValue(value){
     if(value === null || value === undefined || Number.isNaN(Number(value))) return "n/a";
-    return Number(value).toExponential(2);
+    const numericValue = Number(value);
+    const absValue = Math.abs(numericValue);
+    if(absValue > 0 && absValue < 0.0001) return numericValue.toExponential(2);
+    return numericValue.toFixed(4);
 }
 
 function plotTemporal(){
